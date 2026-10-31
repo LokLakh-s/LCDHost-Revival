@@ -28,6 +28,7 @@
 
 typedef struct libusb_context libusb_context;
 class LH_Qt_QString;
+class QWinEventNotifier;
 
 class LH_Lg320x240 : public LH_QtPlugin
 {
@@ -36,8 +37,18 @@ class LH_Lg320x240 : public LH_QtPlugin
     int timer_id_;
     libusb_context *usb_ctx_;
     LH_Qt_QString *setup_status_;
+    LH_Qt_QString *setup_install_driver_;
+    LH_Qt_QString *setup_remove_driver_;
+
+    // Windows: the elevated LCDHostDriverSetup.exe process, while it runs.
+    void *driver_setup_process_;
+    QWinEventNotifier *driver_setup_notifier_;
+    QString driver_setup_command_;
+    QString driver_setup_log_;
 
     void closeDevice();
+    void runDriverSetup(const QString &command);
+    void stopDriverSetup();
 
 public:
     LH_Lg320x240();
@@ -47,6 +58,9 @@ public:
 
 public slots:
     void setStatus(const QString &text);
+    void installDriver();
+    void removeDriver();
+    void driverSetupFinished();
 };
 
 #endif // LH_LG320x240_H

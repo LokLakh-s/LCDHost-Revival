@@ -73,11 +73,13 @@ See [docs/HARDWARE.md](docs/HARDWARE.md) for the current setup steps.
 
 - ✅ Document device setup per operating system and ship udev rules for Linux
   (`packaging/linux/70-lcdhost.rules`).
-- ⬜ **Windows: install the G19 driver from LCDHost.** Bundle
-  [libwdi](https://github.com/pbatard/libwdi) (LGPL v3) to bind the inbox
-  WinUSB driver to the G19 display interface only (`MI_00`), with an explicit,
-  elevated "Install driver" action and a matching uninstall (driver package
-  and generated certificates).
+- ✅ **Windows: install the G19 driver from LCDHost.** *Install driver* and
+  *Remove driver* in the settings of the G19 plugin run
+  `LCDHostDriverSetup.exe`, an elevated helper built on
+  [libwdi](https://github.com/pbatard/libwdi) (LGPL v3) that binds the inbox
+  WinUSB driver to the G19 display interface only (`MI_00`), and removes the
+  driver package and its certificate again. The CI installs and removes it
+  on every Windows build; it still has to be confirmed with a real G19.
 - ✅ **Use upstream libusb and hidapi**: system packages on Linux
   (pkg-config), official binaries at pinned versions on Windows, instead of
   the 2013-era copies.

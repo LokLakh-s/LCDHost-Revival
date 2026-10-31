@@ -49,7 +49,7 @@ QString LogitechG19::errorText(int libusb_error)
 #ifdef Q_OS_WIN
     case LIBUSB_ERROR_NOT_SUPPORTED:
     case LIBUSB_ERROR_NOT_FOUND:
-        return "G19 found, but its display does not use the WinUSB driver: see the hardware setup guide.";
+        return "G19 found, but its display does not use the WinUSB driver: click Install driver below.";
     case LIBUSB_ERROR_ACCESS:
     case LIBUSB_ERROR_BUSY:
         return "G19 found, but another program is using its display (Logitech Gaming Software?). "

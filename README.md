@@ -77,19 +77,21 @@ cp -r ../layouts LCDHost.app/
 
 ### Windows
 
-With Qt 6 (`msvc2022_64`), Visual Studio 2022 and 7-Zip, first fetch the
-dependencies once.
+With Qt 6 (`msvc2022_64`) and Visual Studio 2022 (with the x64 and ARM64
+C++ build tools), git and 7-Zip, first fetch the dependencies once.
 [`packaging/windows/fetch-deps.ps1`](packaging/windows/fetch-deps.ps1)
-downloads the official libusb and hidapi binaries at pinned versions and
-checks their SHA-256:
+downloads the official libusb and hidapi binaries at pinned versions, checks
+their SHA-256, and builds [libwdi](https://github.com/pbatard/libwdi) for the
+G19 driver installer:
 
 ```bat
 pwsh packaging\windows\fetch-deps.ps1 -Destination C:\lcdhost-deps
 ```
 
-It prints two variables: set the environment variables `LIBUSB_DIR` and
-`HIDAPI_DIR` to these values. Then, from an "x64 Native Tools" command
-prompt:
+It prints three variables: set the environment variables `LIBUSB_DIR`,
+`HIDAPI_DIR` and `LIBWDI_DIR` to these values. Without `LIBWDI_DIR`, everything
+except the G19 driver installer (`LCDHostDriverSetup.exe`) is built. Then,
+from an "x64 Native Tools" command prompt:
 
 ```bat
 mkdir build && cd build

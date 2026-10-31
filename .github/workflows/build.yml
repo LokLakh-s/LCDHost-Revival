@@ -57,7 +57,7 @@ jobs:
           modules: 'qtwebengine qtwebchannel qtpositioning'
           cache: true
 
-      # libusb and hidapi at pinned versions (checked by SHA-256).
+      # libusb, hidapi and libwdi at pinned versions (checked by SHA-256).
       - name: Fetch dependencies
         shell: pwsh
         run: packaging/windows/fetch-deps.ps1 -Destination "$env:RUNNER_TEMP\deps"
@@ -89,6 +89,12 @@ jobs:
           if ($p.HasExited) { throw "LCDHost exited early with code $($p.ExitCode)" }
           Stop-Process -Id $p.Id -Force
           Write-Output 'OK: LCDHost ran 20s'
+
+      # Runs the elevated installer for real: the runner is an administrator
+      # and a throwaway machine.
+      - name: Driver installer test
+        shell: pwsh
+        run: tests/driver-setup/run.ps1 build\LCDHost.app\bin\LCDHostDriverSetup.exe
 
       - uses: actions/upload-artifact@v7
         with:

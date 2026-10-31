@@ -32,6 +32,7 @@ current (inherited) design; planned changes are listed in the
 |---|---|
 | `applications/LCDHost/` | The host application: main window, layout editor, plugin loading, rendering, device handling. |
 | `applications/lh_hid/` | Shared HID access library (wraps the system's hidapi), used by the Logitech HID drivers. |
+| `applications/LCDHostDriverSetup/` | Windows only: elevated helper that installs or removes the WinUSB driver of the G19 display, built on libwdi. |
 | `applications/lh_logger/` | Logging to `Documents/LCDHost/logs/`. |
 | `linkdata/lh_api5plugin/` | The plugin API: `lh_plugin.h` (C ABI) and the `LH_Qt*` C++ helper classes most plugins are built on. |
 | `codeleap/` | Libraries shared by the CodeLeap plugins: JSON (`json`), conditional formatting (`ConditionalFormatting`), offline translation cache (`SimpleTranslator`). |
@@ -40,7 +41,7 @@ current (inherited) design; planned changes are listed in the
 | `lh_features/`, `qmakecache/`, `.qmake.cache.in` | qmake helpers: shared build settings and optional features (shared libraries a project can pull in) defined in `lh_features/lh_*.pri`. |
 | `layouts/` | Default layouts installed on first run. |
 | `packaging/` | Linux udev rules, the Windows dependency script (`windows/fetch-deps.ps1`) and the release packaging used by the CI. |
-| `tests/` | Smoke test and test layouts for individual plugins. |
+| `tests/` | Smoke test, driver installer test and test layouts for individual plugins. |
 
 ## The plugin API
 

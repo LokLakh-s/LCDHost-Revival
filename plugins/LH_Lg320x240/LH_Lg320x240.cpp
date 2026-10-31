@@ -20,8 +20,19 @@
   */
 
 #include <QtGlobal>
+#include <QCoreApplication>
 #include <QDebug>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QStringList>
 #include <QTimerEvent>
+
+#ifdef Q_OS_WIN
+# include <QWinEventNotifier>
+# include <windows.h>
+# include <shellapi.h>
+#endif
 
 #include <libusb.h>
 
@@ -46,10 +57,10 @@ char __lcdhostplugin_xml[] =
   "Logitech 320x240 LCD via USB"
   "</shortdesc>"
   "<longdesc>"
-    "USB-level driver for Logitech 320x240 LCD displays, such as the G19.<br/>"
-    "On Windows, the display interface of the G19 (USB ID 046D C229, interface 0) must use the "
-    "<a href=\"https://learn.microsoft.com/windows-hardware/drivers/usbcon/winusb\">WinUSB</a> driver; "
-    "<a href=\"https://zadig.akeo.ie/\">Zadig</a> can install it. On Linux, install the LCDHost udev rules. "
+    "USB-level driver for Logitech 320x240 LCD displays, such as the G19 and G19s.<br/>"
+    "On Windows, the display interface of the G19 must use Microsoft's "
+    "<a href=\"https://learn.microsoft.com/windows-hardware/drivers/usbcon/winusb\">WinUSB</a> driver: "
+    "use <i>Install driver</i> in the settings of this plugin. On Linux, install the LCDHost udev rules. "
     "See <a href=\"https://github.com/LokLakh-s/LCDHost-Revival/blob/master/docs/HARDWARE.md\">docs/HARDWARE.md</a>."
   "</longdesc>"
 "</lcdhostplugin>";
@@ -61,7 +72,11 @@ LH_Lg320x240::LH_Lg320x240() :
     LH_QtPlugin(),
     timer_id_(0),
     usb_ctx_(0),
-    setup_status_(0)
+    setup_status_(0),
+    setup_install_driver_(0),
+    setup_remove_driver_(0),
+    driver_setup_process_(0),
+    driver_setup_notifier_(0)
 {
 }
 
@@ -71,6 +86,20 @@ const char *LH_Lg320x240::userInit()
 
     setup_status_ = new LH_Qt_QString(this, "Status", "Looking for a G19...",
                                       info_flags, lh_type_string_html);
+#ifdef Q_OS_WIN
+    new LH_Qt_QString(this, "~driver_info",
+                      "LCDHost needs Microsoft's WinUSB driver on the display interface of the G19. "
+                      "The keyboard and its G-keys keep their drivers. Installing it requires "
+                      "administrator rights. While it is installed, Logitech Gaming Software "
+                      "cannot use the display.",
+                      info_flags | LH_FLAG_HIDETITLE, lh_type_string_html);
+    setup_install_driver_ = new LH_Qt_QString(this, "Install driver", "Install driver",
+                                              info_flags | LH_FLAG_HIDETITLE, lh_type_string_button);
+    connect(setup_install_driver_, SIGNAL(changed()), this, SLOT(installDriver()));
+    setup_remove_driver_ = new LH_Qt_QString(this, "Remove driver", "Remove driver",
+                                             info_flags | LH_FLAG_HIDETITLE, lh_type_string_button);
+    connect(setup_remove_driver_, SIGNAL(changed()), this, SLOT(removeDriver()));
+#endif
     new LH_Qt_QString(this, "~guide",
                       QString("<a href=\"%1\">Hardware setup guide</a>").arg(hardware_guide_url),
                       info_flags | LH_FLAG_HIDETITLE, lh_type_string_html);
@@ -96,6 +125,7 @@ const char *LH_Lg320x240::userInit()
 
 void LH_Lg320x240::userTerm()
 {
+    stopDriverSetup();
     if(timer_id_)
     {
         killTimer(timer_id_);
@@ -131,8 +161,8 @@ void LH_Lg320x240::timerEvent(QTimerEvent *ev)
 {
     if(!usb_ctx_ || ev->timerId() != timer_id_)
         return;
-    // A present device reports its own state.
-    if(findChild<LogitechG19 *>())
+    // A present device reports its own state; the driver setup changes it.
+    if(driver_setup_process_ || findChild<LogitechG19 *>())
         return;
 
     libusb_device **list = 0;
@@ -167,3 +197,126 @@ void LH_Lg320x240::timerEvent(QTimerEvent *ev)
     connect(g19, SIGNAL(statusChanged(QString)), this, SLOT(setStatus(QString)));
     setStatus(LogitechG19::readyText());
 }
+
+void LH_Lg320x240::installDriver()
+{
+    runDriverSetup("install");
+}
+
+void LH_Lg320x240::removeDriver()
+{
+    runDriverSetup("uninstall");
+}
+
+#ifdef Q_OS_WIN
+
+void LH_Lg320x240::runDriverSetup(const QString &command)
+{
+    if(driver_setup_process_)
+        return;
+
+    const QString exe = QDir::toNativeSeparators(
+                QCoreApplication::applicationDirPath() + "/LCDHostDriverSetup.exe");
+    if(!QFileInfo::exists(exe))
+    {
+        setStatus("The driver installer (LCDHostDriverSetup.exe) is not part of this build. "
+                  "Install WinUSB with Zadig instead, see the hardware setup guide.");
+        return;
+    }
+
+    // The installer replaces the driver of the device: stop using it first.
+    closeDevice();
+
+    driver_setup_log_ = QDir::toNativeSeparators(QDir::temp().filePath(
+                QString("LCDHostDriverSetup-%1.log").arg(QCoreApplication::applicationPid())));
+    QFile::remove(driver_setup_log_);
+    const QString parameters = QString("%1 --log \"%2\"").arg(command, driver_setup_log_);
+
+    SHELLEXECUTEINFOW info;
+    memset(&info, 0, sizeof(info));
+    info.cbSize = sizeof(info);
+    info.fMask = SEE_MASK_NOCLOSEPROCESS;
+    info.lpVerb = L"runas";
+    info.lpFile = reinterpret_cast<LPCWSTR>(exe.utf16());
+    info.lpParameters = reinterpret_cast<LPCWSTR>(parameters.utf16());
+    info.nShow = SW_HIDE;
+    if(!ShellExecuteExW(&info) || !info.hProcess)
+    {
+        DWORD error = GetLastError();
+        if(error == ERROR_CANCELLED)
+            setStatus("Driver setup cancelled: it needs administrator rights.");
+        else
+            setStatus(QString("Could not start the driver installer (Windows error %1).").arg(error));
+        return;
+    }
+
+    driver_setup_command_ = command;
+    driver_setup_process_ = info.hProcess;
+    driver_setup_notifier_ = new QWinEventNotifier(info.hProcess, this);
+    connect(driver_setup_notifier_, &QWinEventNotifier::activated, this, &LH_Lg320x240::driverSetupFinished);
+    setup_install_driver_->setReadonly(true);
+    setup_remove_driver_->setReadonly(true);
+    setStatus(command == "install" ? "Installing the WinUSB driver..." : "Removing the WinUSB driver...");
+}
+
+void LH_Lg320x240::driverSetupFinished()
+{
+    if(!driver_setup_process_)
+        return;
+
+    DWORD exit_code = 1;
+    GetExitCodeProcess(driver_setup_process_, &exit_code);
+    stopDriverSetup();
+
+    QString error;
+    QFile log(driver_setup_log_);
+    if(log.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        const QStringList lines = QString::fromUtf8(log.readAll()).split('\n', Qt::SkipEmptyParts);
+        for(const QString &line : lines)
+        {
+            qDebug("Lg320x240: driver setup: %s", qPrintable(line.trimmed()));
+            if(line.startsWith("error: "))
+                error = line.mid(7).trimmed();
+        }
+        log.close();
+        log.remove();
+    }
+
+    if(exit_code == 0)
+        setStatus(driver_setup_command_ == "install"
+                  ? "WinUSB driver installed. LCDHost finds the G19 within a few seconds once it is plugged in."
+                  : "WinUSB driver removed. The G19 display uses its previous driver again, if it had one.");
+    else
+        setStatus(QString("Driver setup failed: %1")
+                  .arg(error.isEmpty() ? QString("exit code %1.").arg(exit_code) : error));
+}
+
+void LH_Lg320x240::stopDriverSetup()
+{
+    if(driver_setup_notifier_)
+    {
+        // Called from the notifier's own signal: defer its deletion.
+        driver_setup_notifier_->setEnabled(false);
+        driver_setup_notifier_->deleteLater();
+        driver_setup_notifier_ = 0;
+    }
+    if(driver_setup_process_)
+    {
+        CloseHandle(driver_setup_process_);
+        driver_setup_process_ = 0;
+    }
+    if(setup_install_driver_)
+        setup_install_driver_->setReadonly(false);
+    if(setup_remove_driver_)
+        setup_remove_driver_->setReadonly(false);
+}
+
+#else
+
+// Only Windows needs a driver: Linux and macOS use their own USB stack.
+void LH_Lg320x240::runDriverSetup(const QString &) {}
+void LH_Lg320x240::driverSetupFinished() {}
+void LH_Lg320x240::stopDriverSetup() {}
+
+#endif

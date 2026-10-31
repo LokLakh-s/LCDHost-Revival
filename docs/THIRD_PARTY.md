@@ -24,9 +24,12 @@ These libraries are not in the repository: the build finds them on the system
 |---|---|---|---|---|
 | [libusb](https://libusb.info/) | 1.0.30 (official binaries) | LGPL 2.1 or later | `LH_Lg320x240` (G19 driver) | `libusb-1.0.dll` |
 | [hidapi](https://github.com/libusb/hidapi) | 0.15.0 (official binaries) | GPL v3, BSD-style, or original HIDAPI license (at your choice) | `lh_hid`, Logitech HID drivers | `hidapi.dll` |
+| [libwdi](https://github.com/pbatard/libwdi) | 1.5.1 (built from source) | LGPL 3 or later | `LCDHostDriverSetup` (G19 driver installer) | linked into `LCDHostDriverSetup.exe` |
+| WinUSB and WDF co-installers from the [Windows Driver Kit 8.0 redistributable components](https://go.microsoft.com/fwlink/p/?LinkID=253170) | 8.0 (`wdfcoinstaller.msi`) | Microsoft (WDK redistributable components) | embedded by libwdi in the driver packages it generates | inside `LCDHostDriverSetup.exe` |
 
-The sources of libusb and hidapi are available from their repositories at
-the tags of these versions.
+The sources of libusb, hidapi and libwdi are available from their
+repositories at the tags of these versions. libwdi and Zadig redistribute the
+same Microsoft co-installers.
 
 ## Notes
 

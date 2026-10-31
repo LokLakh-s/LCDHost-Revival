@@ -10,6 +10,11 @@ Versions up to 0.0.38 were released by the original author; see the
 
 ### Added
 
+- Windows: **Install driver** and **Remove driver** in the settings of the
+  G19 plugin (Lg320x240) install or remove Microsoft's WinUSB driver on the
+  display interface of the G19, so Zadig is no longer needed. They run the
+  new `LCDHostDriverSetup.exe`, built on libwdi, which asks for administrator
+  rights. The driver can be installed before the G19 is plugged in.
 - G19: the plugin settings show whether LCDHost can use the G19 and, if not,
   why (not connected, WinUSB driver missing, no permission, display used by
   another program). The G19 is offered in the Output tab only once LCDHost

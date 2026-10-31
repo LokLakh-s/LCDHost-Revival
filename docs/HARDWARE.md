@@ -61,27 +61,47 @@ or G HUB first, since they use the LCD too.
 libusb needs the **display interface** of the G19 (`USB\VID_046D&PID_C229&MI_00`)
 to use Microsoft's generic **WinUSB** driver. Only that interface changes: the
 keyboard (046d:c228) and the G-keys interface (`MI_01`) keep their standard
-drivers.
+drivers. While WinUSB is installed, LGS cannot use the display.
 
-Until LCDHost installs the driver by itself (see the [roadmap](../ROADMAP.md)),
-do it once with [Zadig](https://zadig.akeo.ie/):
+**From LCDHost** (0.2.0 and later):
 
-1. Quit LGS if it is installed; while WinUSB is bound, LGS cannot use the
-   display.
-2. In Zadig, enable *Options → List All Devices* and select the entry whose
-   USB ID is **`046D C229 00`** (interface 0 of the G19 display device; its
-   name mentions the G19 and "Interface 0" or "Display interface").
+1. In the **Plugins** tab, load the *Lg320x240* plugin and select it. Its
+   settings show whether LCDHost can use the G19 and, if not, why.
+2. Click **Install driver** and accept the administrator prompt. The G19
+   does not need to be plugged in: the driver then waits in the Windows
+   driver store until it is.
+3. Within a few seconds the status reads "G19 ready". Select the G19 in the
+   **Output** tab.
+
+`LCDHostDriverSetup.exe`, next to `LCDHost.exe`, does the work with
+[libwdi](https://github.com/pbatard/libwdi), the library behind Zadig. It
+generates a driver package for the display interface and signs it with a
+certificate created on your computer: the certificate is added to the *Trusted
+Root Certification Authorities* and *Trusted Publishers* stores of the local
+machine, and its private key is deleted right after signing, so it cannot sign
+anything else. The driver that actually runs, `winusb.sys`, is part of
+Windows. From an administrator command prompt, `LCDHostDriverSetup install`
+and `LCDHostDriverSetup uninstall` do the same as the buttons.
+
+**To undo it:** click **Remove driver**. It removes the driver package and
+the certificate, and Windows gives the display interface its next best driver:
+Logitech's if LGS is installed, none otherwise. It also removes the WinUSB
+packages that Zadig installed for this interface.
+
+**With Zadig** (builds without `LCDHostDriverSetup.exe`):
+
+1. Quit LGS if it is installed.
+2. In [Zadig](https://zadig.akeo.ie/), enable *Options → List All Devices*
+   and select the entry whose USB ID is **`046D C229 00`** (interface 0 of the
+   G19 display device; its name mentions the G19 and "Interface 0" or
+   "Display interface").
 3. Select **WinUSB** as target driver and click *Replace Driver* (or
    *Install Driver*).
 
-Zadig creates a driver package signed with a certificate generated on your
-machine; the driver that actually runs, `winusb.sys`, is part of Windows.
-
-**To undo it:** in Device Manager, find the G19 display interface under
-*Universal Serial Bus devices*, uninstall it with *Delete the driver software
-for this device* ticked, then unplug and replug the keyboard. Windows should
-then use the Logitech driver again if LGS is installed, or leave the
-interface without a driver.
+To undo a Zadig installation, use **Remove driver** in LCDHost, or in Device
+Manager find the G19 display interface under *Universal Serial Bus devices*,
+uninstall it with *Delete the driver software for this device* ticked, then
+unplug and replug the keyboard.
 
 ## Prior art
 

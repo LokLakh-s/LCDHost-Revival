@@ -11,4 +11,7 @@ HEADERS += \
     LH_Lg320x240.h \
     LogitechG19.h
 
+# ShellExecuteExW, to start the elevated driver installer.
+win32: LIBS *= -lshell32
+
 DESTDIR=$$lh_destdir()
