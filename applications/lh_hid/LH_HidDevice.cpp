@@ -50,6 +50,9 @@ LH_HidDevice::LH_HidDevice(
     handle_(0),
     unused_(true),
     online_(false),
+    listeners_(0),
+    retired_(false),
+    present_(0),
     device_path_(device_path),
     vendor_id_(vendor_id & 0xFFFF),
     product_id_(product_id & 0xFFFF),
@@ -61,6 +64,82 @@ LH_HidDevice::LH_HidDevice(
     usage_(usage & 0xFFFF)
 {
     setObjectName(QString::fromUtf8(device_path.constData()));
+    usages_.append(((usage_page & 0xFFFF) << 16) | (usage & 0xFFFF));
+}
+
+bool LH_HidDevice::hasUsage(int usage_page, int usage) const
+{
+    return usages_.contains(((usage_page & 0xFFFF) << 16) | (usage & 0xFFFF));
+}
+
+QByteArray LH_HidDevice::interfacePath() const
+{
+    QByteArray path(device_path_);
+    int col = path.toLower().indexOf("&col");
+    if(col > 0)
+    {
+        int end = col + 4;
+        while(end < path.size() && isxdigit((unsigned char) path.at(end)))
+            ++end;
+        path.remove(col, end - col);
+    }
+    return path;
+}
+
+// Posts a request to the HID thread and waits for its result. Returns false
+// on timeout, after which the request belongs to the HID thread.
+static bool execute(QObject *worker, LH_HidRequest *hid_data)
+{
+    QCoreApplication::postEvent(worker, new LH_HidRequestEvent(hid_data));
+    if(! hid_data->wait())
+    {
+        hid_data->setError("timeout");
+        qDebug("HID: %s", hid_data->error());
+        hid_data->abandon();
+        return false;
+    }
+    return true;
+}
+
+bool LH_HidDevice::open(QString *errorText, int *errorCode)
+{
+    LH_HidRequest *hid_data = new LH_HidRequest(this, LH_HidRequest::HidOpen);
+    if(! execute(parent(), hid_data))
+    {
+        if(errorText)
+            *errorText = QString::fromLatin1("no answer from the HID thread");
+        if(errorCode)
+            *errorCode = 0;
+        return false;
+    }
+    bool ok = hid_data->resultCode() == 0;
+    if(errorText)
+        *errorText = ok ? QString() : QString::fromLocal8Bit(hid_data->error());
+    if(errorCode)
+        *errorCode = ok ? 0 : hid_data->errorCode();
+    delete hid_data;
+    return ok;
+}
+
+LH_HidReportInfo LH_HidDevice::reportInfo()
+{
+    LH_HidRequest *hid_data = new LH_HidRequest(this, LH_HidRequest::HidReportDescriptor, 0);
+    if(! execute(parent(), hid_data))
+        return LH_HidReportInfo();
+    LH_HidReportInfo info(hid_data->report());
+    delete hid_data;
+    return info;
+}
+
+bool LH_HidDevice::listen(bool enable)
+{
+    LH_HidRequest *hid_data = new LH_HidRequest(
+                this, enable ? LH_HidRequest::HidListen : LH_HidRequest::HidUnlisten, 0);
+    if(! execute(parent(), hid_data))
+        return false;
+    bool ok = hid_data->resultCode() == 0;
+    delete hid_data;
+    return ok;
 }
 
 bool LH_HidDevice::online()

@@ -38,6 +38,7 @@ class LH_HidWorker : public QObject
     static int event_publish_;
 
     int timer_id_;
+    int poll_timer_id_;
     bool hidapi_inited_;
 
 public:
@@ -52,8 +53,11 @@ signals:
 protected:
     friend class LH_HidThread;
     explicit LH_HidWorker();
-    void timerEvent(QTimerEvent *ev); // enumerates HID devices
+    void timerEvent(QTimerEvent *ev); // enumerates HID devices, polls input
     void enumerateDevices();
+    void updatePolling();
+    void pollInput();
+    int readDescriptor(LH_HidDevice *hd) const;
     void setOnline(LH_HidDevice *hd, bool state) const;
 
     void customEvent(QEvent *ev);

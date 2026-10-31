@@ -21,8 +21,12 @@
 #define LH_HIDDEVICE_H
 
 #include <QObject>
+#include <QAtomicInt>
 #include <QByteArray>
+#include <QList>
 #include <QString>
+
+#include "LH_HidReportInfo.h"
 
 #if defined(LH_HID_LIBRARY)
 # define LH_HID_EXPORT Q_DECL_EXPORT
@@ -49,15 +53,38 @@ public:
     QString product_text() const { return product_text_; }
     int usage_page() const { return usage_page_; }
     int usage() const { return usage_; }
+    // True if one of the top-level collections of the device has this usage.
+    // On Linux, a device is a whole HID interface and can have several.
+    bool hasUsage(int usage_page, int usage) const;
+    // The path of the HID interface: the device path without the top-level
+    // collection part that Windows adds ("&col02").
+    QByteArray interfacePath() const;
 
+    // True while the device is connected, even if it cannot be opened.
+    bool present() const { return present_.loadRelaxed() != 0; }
     bool online();
+    // Opens the device if it is not open yet. Returns true on success, else
+    // false with the reason in errorText and, on Linux, the errno value in
+    // errorCode (EACCES: no permission).
+    bool open(QString *errorText = 0, int *errorCode = 0);
+    // The reports that the report descriptor of the device declares. The
+    // descriptor is read from sysfs on Linux, so it is known even when the
+    // device cannot be opened.
+    LH_HidReportInfo reportInfo();
+
     QByteArray read(int max_size = 256);
     int write(const QByteArray &report);
     QByteArray readFeature(int n, int max_size = 256);
     int writeFeature(const QByteArray &report);
 
+    // While at least one listener is registered, the input reports of the
+    // device are delivered by inputReport(), with the report ID as first byte
+    // when the device uses report IDs.
+    bool listen(bool enable);
+
 signals:
     void onlineChanged(bool online);
+    void inputReport(const QByteArray &report);
 
 protected:
     friend class LH_HidWorker;
@@ -77,6 +104,11 @@ protected:
     void *handle_;
     bool unused_;
     bool online_;
+    int listeners_;
+    bool retired_; // replaced by another device with the same path
+    QAtomicInt present_;
+    QByteArray descriptor_;
+    QList<int> usages_; // (usage page << 16) | usage, frozen once published
     QByteArray device_path_;
     int vendor_id_;
     int product_id_;

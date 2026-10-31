@@ -29,8 +29,15 @@
 #include <QThread>
 #include <QEvent>
 #include <QCoreApplication>
+#include <QFile>
+#include <QSet>
 #include <QStringList>
+#include <QTimerEvent>
 #include <QDebug>
+
+// Input reports are read this often while a driver listens to a device. The
+// operating system queues the reports in between.
+static const int poll_interval_ms = 20;
 
 QAtomicPointer<LH_HidWorker> LH_HidWorker::instance_ = 0;
 int LH_HidWorker::event_publish_ = -1;
@@ -58,6 +65,7 @@ bool LH_HidWorker::subscribe(QObject *recipient, const char *slot)
 LH_HidWorker::LH_HidWorker() :
     QObject(0),
     timer_id_(0),
+    poll_timer_id_(0),
     hidapi_inited_(false)
 {
     if(instance_.testAndSetOrdered(0, this))
@@ -78,6 +86,10 @@ LH_HidWorker::~LH_HidWorker()
           killTimer(timer_id_);
           timer_id_ = 0;
         }
+        if (poll_timer_id_) {
+          killTimer(poll_timer_id_);
+          poll_timer_id_ = 0;
+        }
         stopHidApi();
     }
 }
@@ -85,7 +97,7 @@ LH_HidWorker::~LH_HidWorker()
 bool LH_HidWorker::checkOnline(LH_HidDevice *hd) const
 {
     Q_ASSERT(hd->unused_ == false);
-    if(hidapi_inited_ == false || hd->device_path_.isEmpty())
+    if(hidapi_inited_ == false || hd->retired_ || hd->device_path_.isEmpty())
         return false;
     if(hd->handle_ == 0)
     {
@@ -138,19 +150,79 @@ void LH_HidWorker::setOnline(LH_HidDevice *hd, bool state) const
 }
 
 
+int LH_HidWorker::readDescriptor(LH_HidDevice *hd) const
+{
+    if(hd->descriptor_.isEmpty() && !hd->retired_)
+    {
+#if defined(Q_OS_LINUX)
+        // hidapi uses hidraw nodes (/dev/hidrawN) on Linux. Their report
+        // descriptor is in sysfs, readable even without access to the node.
+        QByteArray node = hd->device_path_.mid(hd->device_path_.lastIndexOf('/') + 1);
+        QFile file(QString::fromLatin1("/sys/class/hidraw/%1/device/report_descriptor")
+                   .arg(QString::fromLocal8Bit(node)));
+        if(!node.isEmpty() && file.open(QIODevice::ReadOnly))
+            hd->descriptor_ = file.read(4096);
+#elif defined(HID_API_VERSION)
+# if HID_API_VERSION >= HID_API_MAKE_VERSION(0, 14, 0)
+        // On Windows, hidapi rebuilds the descriptor of the top-level collection.
+        bool was_open = hd->handle_ != 0;
+        if(hidapi_inited_ && !was_open)
+            hd->handle_ = hid_open_path(hd->device_path());
+        if(hd->handle_)
+        {
+            unsigned char buffer[HID_API_MAX_REPORT_DESCRIPTOR_SIZE];
+            int size = hid_get_report_descriptor((hid_device*) hd->handle_, buffer, sizeof(buffer));
+            if(size > 0)
+                hd->descriptor_ = QByteArray((const char *) buffer, size);
+            if(!was_open)
+                closeDevice(hd);
+        }
+# endif
+#endif
+    }
+    return hd->descriptor_.size();
+}
+
 void LH_HidWorker::processRequest(LH_HidRequest *hidreq)
 {
     LH_HidDevice *hd = hidreq->device();
     int retv = -1;
     const char *error_source = "hid_open_path";
     errno = 0;
-    hd->unused_ = false;
 
-    if(checkOnline(hd))
+    switch(hidreq->request())
     {
+    case LH_HidRequest::HidReportDescriptor:
+        // Does not mark the device as used: drivers read the descriptor to
+        // find out whether a device is theirs at all.
+        error_source = "no report descriptor";
+        retv = readDescriptor(hd);
+        if(retv > 0)
+            hidreq->report() = hd->descriptor_;
+        else
+            retv = -1;
+        break;
+
+    case LH_HidRequest::HidUnlisten:
+        if(hd->listeners_ > 0)
+            -- hd->listeners_;
+        updatePolling();
+        retv = 0;
+        break;
+
+    default:
+        hd->unused_ = false;
+        if(! checkOnline(hd))
+            break;
         switch(hidreq->request())
         {
         case LH_HidRequest::HidCheckOnline:
+        case LH_HidRequest::HidOpen:
+            retv = 0;
+            break;
+        case LH_HidRequest::HidListen:
+            ++ hd->listeners_;
+            updatePolling();
             retv = 0;
             break;
         case LH_HidRequest::HidRead:
@@ -184,11 +256,21 @@ void LH_HidWorker::processRequest(LH_HidRequest *hidreq)
 
         if(retv < 0)
             closeDevice(hd);
+        break;
     }
 
     hidreq->result_code_ = retv;
     if(retv < 0)
+    {
         hidreq->setError(error_source, errno);
+        if(hidreq->request() == LH_HidRequest::HidOpen)
+        {
+            // hidapi describes why the device could not be opened.
+            const wchar_t *reason = hid_error(0);
+            if(reason && *reason)
+                hidreq->setError(QString::fromWCharArray(reason).toLocal8Bit().constData());
+        }
+    }
 
     if(hidreq->semaphore_.tryAcquire())
     {
@@ -202,101 +284,135 @@ void LH_HidWorker::processRequest(LH_HidRequest *hidreq)
     return;
 }
 
+void LH_HidWorker::updatePolling()
+{
+    bool needed = false;
+    foreach(LH_HidDevice *hd, findChildren<LH_HidDevice *>())
+    {
+        if(hd->listeners_ > 0)
+        {
+            needed = true;
+            break;
+        }
+    }
+    if(needed && !poll_timer_id_)
+        poll_timer_id_ = startTimer(poll_interval_ms);
+    else if(!needed && poll_timer_id_)
+    {
+        killTimer(poll_timer_id_);
+        poll_timer_id_ = 0;
+    }
+}
+
+void LH_HidWorker::pollInput()
+{
+    unsigned char buffer[256];
+    foreach(LH_HidDevice *hd, findChildren<LH_HidDevice *>())
+    {
+        // A device closed after an error is reopened by the next enumeration.
+        if(hd->listeners_ <= 0 || !hd->online_ || !hd->handle_)
+            continue;
+        // Devices are open in non-blocking mode: hid_read() returns 0 when
+        // no report is waiting. Bound the loop so one device cannot starve
+        // the others.
+        for(int i = 0; i < 64; ++i)
+        {
+            int size = hid_read((hid_device*) hd->handle_, buffer, sizeof(buffer));
+            if(size < 0)
+            {
+                closeDevice(hd);
+                break;
+            }
+            if(size == 0)
+                break;
+            emit hd->inputReport(QByteArray((const char *) buffer, size));
+        }
+    }
+}
+
 void LH_HidWorker::enumerateDevices()
 {
     QSet<LH_HidDevice *> enumerated_set;
-    bool need_reset = false;
+    QSet<LH_HidDevice *> created_set;
 
     if(struct hid_device_info *hdi_head = hid_enumerate(0, 0))
     {
         for(struct hid_device_info *hdi = hdi_head; hdi; hdi = hdi->next)
         {
-            if(hdi->path && *hdi->path)
+            if(!(hdi->path && *hdi->path))
+                continue;
+
+            QByteArray device_path(hdi->path);
+            const QString serial_text = QString::fromWCharArray(hdi->serial_number);
+            LH_HidDevice *hd = 0;
+            foreach(LH_HidDevice *child, findChildren<LH_HidDevice *>(QString::fromUtf8(device_path)))
             {
-                QByteArray device_path(hdi->path);
-                LH_HidDevice *hd = findChild<LH_HidDevice *>(QString::fromUtf8(device_path));
-                if(hd == 0)
+                if(child->retired_)
+                    continue;
+                if(child->vendor_id() == (hdi->vendor_id & 0xFFFF) &&
+                        child->product_id() == (hdi->product_id & 0xFFFF) &&
+                        child->serial_text() == serial_text)
                 {
-                    hd = new LH_HidDevice(
-                                device_path,
-                                hdi->vendor_id,
-                                hdi->product_id,
-                                hdi->release_number,
-                                QString::fromWCharArray(hdi->serial_number),
-                                QString::fromWCharArray(hdi->manufacturer_string),
-                                QString::fromWCharArray(hdi->product_string),
-                                hdi->usage_page,
-                                hdi->usage,
-                                this
-                                );
+                    hd = child;
+                    break;
                 }
-#if 0
-                qDebug("HID: %s '%s': %04x:%04x:%04x:%04x %s%s%s [%p]",
-                       hd->device_path(),
-                       hd->product_text().toLocal8Bit().constData(),
-                       hdi->vendor_id, hdi->product_id, hdi->usage_page, hdi->usage,
-                       enumerated_set.contains(hd) ? "(duplicate)" : "enumerated",
-                       hd->online_ ? " online" : "",
-                       hd->unused_ ? " unused" : "",
-                       hd->handle_
-                       );
-#endif
-                if(enumerated_set.contains(hd))
-                {
-                    if((! hd->unused_) &&
-                            hd->usage_page() == hdi->usage_page &&
-                            hd->usage() == hdi->usage &&
-                            hd->device_version() == hdi->release_number &&
-                            hd->serial_text() == QString::fromWCharArray(hdi->serial_number))
-                    {
-                        qDebug("HID: %s '%s': already enumerated",
-                                  hd->device_path(),
-                                  hd->product_text().toLocal8Bit().constData()
-                                  );
-                        need_reset = true;
-                    }
-                }
-                else
-                {
-                    enumerated_set.insert(hd);
-                }
+                // Another device got the path (Linux reuses hidraw numbers):
+                // the old one is offline for good, drivers get a new object.
+                child->retired_ = true;
+                closeDevice(child);
             }
+
+            if(hd == 0)
+            {
+                hd = new LH_HidDevice(
+                            device_path,
+                            hdi->vendor_id,
+                            hdi->product_id,
+                            hdi->release_number,
+                            serial_text,
+                            QString::fromWCharArray(hdi->manufacturer_string),
+                            QString::fromWCharArray(hdi->product_string),
+                            hdi->usage_page,
+                            hdi->usage,
+                            this
+                            );
+                created_set.insert(hd);
+            }
+            else if(enumerated_set.contains(hd) && created_set.contains(hd))
+            {
+                // On Linux, hidapi lists each top-level collection of an
+                // interface with the same path. Record the usages until the
+                // device is published; they do not change afterwards.
+                int usage = ((hdi->usage_page & 0xFFFF) << 16) | (hdi->usage & 0xFFFF);
+                if(!hd->usages_.contains(usage))
+                    hd->usages_.append(usage);
+            }
+            enumerated_set.insert(hd);
         }
         hid_free_enumeration(hdi_head);
     }
     // hid_enumerate() also returns NULL when no HID device is present: the
     // known devices are then simply offline.
 
-    if(need_reset)
+    foreach(LH_HidDevice *hd, findChildren<LH_HidDevice *>())
     {
-        stopHidApi();
-    }
-    else
-    {
-        foreach(LH_HidDevice *hd, findChildren<LH_HidDevice *>())
-        {
-            bool is_online = enumerated_set.contains(hd);
-            if(is_online && ! hd->unused_)
-                is_online = checkOnline(hd);
-#if 0
-            qDebug("HID: %s '%s': %s%s [%p] %d",
-                   hd->device_path(),
-                   hd->product_text().toLocal8Bit().constData(),
-                   (hd->online_ == is_online) ?
-                       (is_online ? "online" : "offline") :
-                       (is_online ? "came online " : "went offline "),
-                   (hd->unused_ ? " unused" : ""),
-                   hd->handle_,
-                   hd->error_count_
-                   );
-#endif
-            setOnline(hd, is_online);
-        }
+        bool is_present = enumerated_set.contains(hd);
+        bool is_online = is_present;
+        hd->present_.storeRelaxed(is_present ? 1 : 0);
+        if(is_online && ! hd->unused_)
+            is_online = checkOnline(hd);
+        setOnline(hd, is_online);
     }
 }
 
 void LH_HidWorker::timerEvent(QTimerEvent *ev)
 {
+    if(poll_timer_id_ && ev->timerId() == poll_timer_id_)
+    {
+        if(hidapi_inited_)
+            pollInput();
+        return;
+    }
     if(timer_id_ && ev->timerId() == timer_id_)
     {
         if (QCoreApplication::startingUp() || QCoreApplication::closingDown())

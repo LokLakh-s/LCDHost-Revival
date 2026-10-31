@@ -47,7 +47,19 @@ void LH_HidRequest::setError(const char *text, int code)
         case HidWriteFeature:
             error_.append("' writeFeature:");
             break;
+        case HidOpen:
+            error_.append("' open:");
+            break;
+        case HidReportDescriptor:
+            error_.append("' reportDescriptor:");
+            break;
+        case HidListen:
+        case HidUnlisten:
+            error_.append("' listen:");
+            break;
         }
+        if(code > 0)
+            error_code_ = code;
     }
     else
         error_.append(';');

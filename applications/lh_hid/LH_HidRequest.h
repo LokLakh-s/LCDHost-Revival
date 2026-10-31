@@ -36,21 +36,27 @@ public:
         HidRead,
         HidWrite,
         HidReadFeature,
-        HidWriteFeature
+        HidWriteFeature,
+        HidOpen,
+        HidReportDescriptor,
+        HidListen,
+        HidUnlisten
     };
 
     explicit LH_HidRequest(LH_HidDevice *device, LH_HidRequest::Request request, const QByteArray &report) :
         device_(device),
         request_(request),
         report_(report),
-        result_code_(-1)
+        result_code_(-1),
+        error_code_(0)
     {}
 
     explicit LH_HidRequest(LH_HidDevice *device, LH_HidRequest::Request request, int max_size = 256) :
         device_(device),
         request_(request),
         report_(max_size, '\0'),
-        result_code_(-1)
+        result_code_(-1),
+        error_code_(0)
     {}
 
     LH_HidDevice *device() const { return device_; }
@@ -61,6 +67,8 @@ public:
     size_t size() const { return (size_t) report_.size(); }
     int resultCode() const { return result_code_; }
     const char * error() const { return error_.isNull() ? 0 : error_.constData(); }
+    // The errno value of the first error, 0 if unknown.
+    int errorCode() const { return error_code_; }
     void setError(const char *text, int code = -1);
 
     bool wait(int timeout = 1000);
@@ -73,6 +81,7 @@ protected:
     Request request_;
     QByteArray report_;
     int result_code_;
+    int error_code_;
     QByteArray error_;
     QSemaphore semaphore_;
 };
