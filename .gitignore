@@ -9,6 +9,7 @@ Release/
 *.qmlproject.user*
 .qmake.stash
 QT_HOST_BINS
+aqtinstall.log
 Makefile*
 moc_*.cpp
 ui_*.h
