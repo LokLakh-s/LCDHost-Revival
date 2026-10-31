@@ -77,6 +77,10 @@ cp -r ../layouts LCDHost.app/
 ./LCDHost.app/bin/LCDHost
 ```
 
+`packaging/linux/build-appimage.sh LCDHost.app <version> <output dir>` then
+builds an AppImage (it downloads linuxdeploy at a pinned version, and needs
+the `qtserialport` Qt module and the `file` command).
+
 ### Windows
 
 With Qt 6 (`msvc2022_64`) and Visual Studio 2022 (with the x64 and ARM64
