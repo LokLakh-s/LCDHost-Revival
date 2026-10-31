@@ -18,11 +18,15 @@ if [ "$source_version" != "$version" ]; then
     exit 1
 fi
 
+# The section of the version, with its wrapped list items joined into one
+# line each: GitHub shows line breaks of release notes as is.
 notes=$(awk -v header="## [$version]" '
     index($0, header) == 1 { found = 1; next }
     found && (/^## \[/ || /^\[[^]]+\]: /) { exit }
     found && !started && /^[[:space:]]*$/ { next }
-    found { started = 1; sub(/^### /, "## "); print }
+    found && started && /^  +[^ ]/ && line != "" { sub(/^ +/, ""); line = line " " $0; next }
+    found { if (started) print line; started = 1; sub(/^### /, "## "); line = $0 }
+    END { if (started) print line }
 ' "$src/CHANGELOG.md")
 if [ -z "$(echo "$notes" | tr -d '[:space:]')" ]; then
     echo "error: no \"## [$version]\" section in CHANGELOG.md" >&2
