@@ -45,12 +45,12 @@
 # endif
 # include "windows.h"
 // # include "../wow64.h"
-# include "win/lglcd.h"
+# include <lglcd.h> // Logitech LCD SDK, see LH_LgLcdMan.pro
 #endif
 
 #ifdef Q_OS_MAC
-# include "mac/lgLcdError.h"
-# include "mac/lgLcd.h"
+# include <lgLcdError.h> // Logitech LCD SDK, see LH_LgLcdMan.pro
+# include <lgLcd.h>
 # ifndef ERROR_FILE_NOT_FOUND
 #  define ERROR_FILE_NOT_FOUND 2
 # endif

@@ -8,7 +8,6 @@ below lists what is bundled, where, and under which terms.
 |---|---|---|---|---|
 | [TagLib](https://taglib.org/) | 1.7.0 | `3rdParty/taglib/` | LGPL 2.1 or MPL 1.1 | `LH_NowPlaying` (cover art, tags) |
 | [zlib](https://zlib.net/) | 1.2.5 | `3rdParty/zlib/` | zlib license | TagLib |
-| Logitech LCD SDK (`lglcd.h`, `lglcd.lib`, `liblgLcd.a`) | 3.0 or later | `plugins/LH_LgLcdMan/win/`, `plugins/LH_LgLcdMan/mac/` | **Proprietary** (Logitech LCD SDK License Agreement) | `LH_LgLcdMan` |
 | iTunes COM SDK (generated headers) | — | `plugins/LH_NowPlaying/SDKs/iTunes/` | **Proprietary** (Apple) | `LH_NowPlaying` |
 | Winamp SDK headers (`wa_*.h`) | — | `plugins/LH_NowPlaying/SDKs/Winamp/` | Nullsoft SDK terms | `LH_NowPlaying` |
 | Icons based on the Silk set (resized to 12, 14 and 16 px) | — | `layouts/g19-eos/Status Icons/` | [CC BY 2.5](https://creativecommons.org/licenses/by/2.5/), Silk by Mark James (famfamfam.com) | sample layout |
@@ -33,11 +32,13 @@ same Microsoft co-installers.
 
 ## Notes
 
-- **Proprietary SDKs.** The Logitech LCD SDK and the iTunes COM SDK were
-  shipped by the original project. Their license agreements are not included
-  in this repository, and it has not been verified that they allow
-  redistribution. Removing them from the repository (and asking developers to
-  install the SDKs themselves) is tracked in the [roadmap](../ROADMAP.md).
+- **Proprietary SDKs.** The original project shipped the Logitech LCD SDK
+  and the iTunes COM SDK, whose license agreements are not included here and
+  have not been checked for redistribution. The Logitech LCD SDK was removed
+  in 0.3.0: the `LH_LgLcdMan` plugin is only built when a developer points
+  `LGLCD_SDK_DIR` to their own copy (see the [README](../README.md)), and the
+  releases no longer include it. Removing the iTunes COM SDK is tracked in the
+  [roadmap](../ROADMAP.md).
 - **Outdated copies.** The bundled TagLib and zlib are more than ten years
   old and miss security fixes (zlib 1.2.5 in particular). Replacing them with
   current upstream versions, as was done for libusb and hidapi, is part of

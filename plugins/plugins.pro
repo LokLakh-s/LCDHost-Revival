@@ -32,8 +32,16 @@ SUBDIRS += \
 win32: SUBDIRS += \
     LH_DriveStats \
     LH_LCoreReboot \
-    LH_LgLcdMan \
     LH_Monitoring \
     LH_NowPlaying
+
+# Optional: the LCD plugin that goes through Logitech Gaming Software needs
+# your own copy of the proprietary Logitech LCD SDK, see README.md.
+win32 {
+    LGLCD_SDK = $$LGLCD_SDK_DIR
+    isEmpty(LGLCD_SDK): LGLCD_SDK = $$(LGLCD_SDK_DIR)
+    !isEmpty(LGLCD_SDK): SUBDIRS += LH_LgLcdMan
+    else: message("LGLCD_SDK_DIR is not set: LH_LgLcdMan (Logitech LCD SDK plugin) is not built")
+}
 
 OTHER_FILES += Plugins.pri
