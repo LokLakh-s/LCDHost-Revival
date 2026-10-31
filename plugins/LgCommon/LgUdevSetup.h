@@ -50,9 +50,9 @@ private slots:
     void install();
     void remove();
     void finished(bool ok, const QString &message);
+    void refresh();
 
 private:
-    void refresh();
 
     LH_UdevRules *rules_;
     LH_Qt_QString *info_;

@@ -19,6 +19,8 @@
 
 #include "LgUdevSetup.h"
 
+#include <QTimer>
+
 #include "LH_QtObject.h"
 #include "LH_Qt_QString.h"
 #include "LH_UdevRules.h"
@@ -45,6 +47,11 @@ LgUdevSetup::LgUdevSetup(LH_QtObject *parent) :
                                 flags, lh_type_string_button);
     connect(remove_, SIGNAL(changed()), this, SLOT(remove()));
     refresh();
+
+    // Also notices rules installed or removed from a terminal.
+    QTimer *timer = new QTimer(this);
+    connect(timer, SIGNAL(timeout()), this, SLOT(refresh()));
+    timer->start(5000);
 }
 
 QString LgUdevSetup::permissionHint()
