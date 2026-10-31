@@ -27,6 +27,7 @@
 #include <LH_QtPlugin.h>
 
 typedef struct libusb_context libusb_context;
+class LH_HidDevice;
 class LH_Qt_QString;
 class QWinEventNotifier;
 
@@ -45,10 +46,15 @@ class LH_Lg320x240 : public LH_QtPlugin
     QWinEventNotifier *driver_setup_notifier_;
     QString driver_setup_command_;
     QString driver_setup_log_;
+    // The HID interface that sends the G-keys and M-keys, and their state.
+    LH_HidDevice *gkeys_hd_;
+    quint32 gkeys_pressed_;
 
     void closeDevice();
     void runDriverSetup(const QString &command);
     void stopDriverSetup();
+    void stopGKeys();
+    void sendGKey(int index, bool down);
 
 public:
     LH_Lg320x240();
@@ -61,6 +67,8 @@ public slots:
     void installDriver();
     void removeDriver();
     void driverSetupFinished();
+    void hidOnlineChanged(LH_HidDevice *hd, bool online);
+    void gkeysReport(const QByteArray &report);
 };
 
 #endif // LH_LG320x240_H

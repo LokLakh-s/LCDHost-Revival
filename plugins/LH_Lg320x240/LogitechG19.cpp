@@ -145,7 +145,7 @@ LogitechG19::LogitechG19(libusb_context *ctx, libusb_device *usbdev, libusb_devi
         }
         if( conf_desc ) libusb_free_config_descriptor( conf_desc );
     }
-    setDevid("Lg320x240-G19");
+    setDevid(deviceId());
     setName("Logitech G19 LCD (USB)");
     setSize(320,240);
     setDepth(16);
@@ -265,7 +265,7 @@ void LogitechG19::buttons( libusb_transfer * )
                 case 0x80: di.control = "Up"; break;
                 default: di.control = "Unknown"; break;
                 }
-                di.item = bit;
+                di.item = bit + 1; // must not be zero
                 di.flags = lh_df_button;
                 if( new_buttons_ & mask )
                 {
@@ -277,6 +277,8 @@ void LogitechG19::buttons( libusb_transfer * )
                     di.flags |= lh_df_up;
                     di.value = 0x0;
                 }
+                qDebug("Lg320x240: G19: %s %s", di.control,
+                       (di.flags & lh_df_down) ? "pressed" : "released");
                 callback( lh_cb_input, (void*) &di );
             }
         }

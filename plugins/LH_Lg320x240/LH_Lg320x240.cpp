@@ -36,9 +36,12 @@
 
 #include <libusb.h>
 
+#include "LH_HidDevice.h"
+#include "LH_HidReportInfo.h"
 #include "LH_QtDevice.h"
 #include "LH_Qt_QString.h"
 #include "LH_Lg320x240.h"
+#include "G19Keys.h"
 #include "LogitechG19.h"
 
 LH_PLUGIN(LH_Lg320x240)
@@ -57,7 +60,8 @@ char __lcdhostplugin_xml[] =
   "Logitech 320x240 LCD via USB"
   "</shortdesc>"
   "<longdesc>"
-    "USB-level driver for Logitech 320x240 LCD displays, such as the G19 and G19s.<br/>"
+    "USB-level driver for Logitech 320x240 LCD displays, such as the G19 and G19s. "
+    "It also reports the G-keys, M-keys and LCD keys to layouts.<br/>"
     "On Windows, the display interface of the G19 must use Microsoft's "
     "<a href=\"https://learn.microsoft.com/windows-hardware/drivers/usbcon/winusb\">WinUSB</a> driver: "
     "use <i>Install driver</i> in the settings of this plugin. On Linux, install the LCDHost udev rules. "
@@ -76,7 +80,9 @@ LH_Lg320x240::LH_Lg320x240() :
     setup_install_driver_(0),
     setup_remove_driver_(0),
     driver_setup_process_(0),
-    driver_setup_notifier_(0)
+    driver_setup_notifier_(0),
+    gkeys_hd_(0),
+    gkeys_pressed_(0)
 {
 }
 
@@ -104,6 +110,9 @@ const char *LH_Lg320x240::userInit()
                       QString("<a href=\"%1\">Hardware setup guide</a>").arg(hardware_guide_url),
                       info_flags | LH_FLAG_HIDETITLE, lh_type_string_html);
 
+    // The G-keys come through HID, whatever the state of the display.
+    LH_HidDevice::subscribe(this, SLOT(hidOnlineChanged(LH_HidDevice*,bool)));
+
     if(!usb_ctx_)
     {
         int retv = libusb_init(&usb_ctx_);
@@ -125,6 +134,7 @@ const char *LH_Lg320x240::userInit()
 
 void LH_Lg320x240::userTerm()
 {
+    stopGKeys();
     stopDriverSetup();
     if(timer_id_)
     {
@@ -137,6 +147,72 @@ void LH_Lg320x240::userTerm()
         libusb_exit(usb_ctx_);
         usb_ctx_ = 0;
     }
+}
+
+void LH_Lg320x240::hidOnlineChanged(LH_HidDevice *hd, bool online)
+{
+    if(hd->vendor_id() != 0x046d || hd->product_id() != 0xc229)
+        return;
+    if(!online)
+    {
+        if(hd == gkeys_hd_)
+            stopGKeys();
+        return;
+    }
+    if(gkeys_hd_)
+        return;
+    // Windows lists the top-level collections of the interface separately:
+    // take the one that declares the key report.
+    LH_HidReportInfo info = hd->reportInfo();
+    bool has_keys = info.isValid() ? info.has(LH_HidReportInfo::Input, G19Keys::ReportId)
+                                   : hd->hasUsage(0xFF00, 0x0000);
+    if(!has_keys)
+        return;
+    gkeys_hd_ = hd;
+    gkeys_pressed_ = 0;
+    connect(hd, SIGNAL(inputReport(QByteArray)), this, SLOT(gkeysReport(QByteArray)));
+    hd->listen(true);
+}
+
+void LH_Lg320x240::stopGKeys()
+{
+    if(!gkeys_hd_)
+        return;
+    disconnect(gkeys_hd_, 0, this, 0);
+    gkeys_hd_->listen(false);
+    gkeys_hd_ = 0;
+    // Release what was held down, so that layouts do not see stuck keys.
+    for(int i = 0; i < G19Keys::count(); ++i)
+        if(gkeys_pressed_ & (quint32(1) << i))
+            sendGKey(i, false);
+    gkeys_pressed_ = 0;
+}
+
+void LH_Lg320x240::gkeysReport(const QByteArray &report)
+{
+    quint32 pressed = 0;
+    if(!G19Keys::decode(report, &pressed) || pressed == gkeys_pressed_)
+        return;
+    for(int i = 0; i < G19Keys::count(); ++i)
+    {
+        quint32 mask = quint32(1) << i;
+        if((pressed & mask) != (gkeys_pressed_ & mask))
+            sendGKey(i, (pressed & mask) != 0);
+    }
+    gkeys_pressed_ = pressed;
+}
+
+void LH_Lg320x240::sendGKey(int index, bool down)
+{
+    lh_device_input di;
+    di.devid = LogitechG19::deviceId();
+    di.control = G19Keys::name(index);
+    di.item = 0x100 + index; // distinct from the LCD keys of LogitechG19
+    di.flags = lh_df_button | (down ? lh_df_down : lh_df_up);
+    di.value = down ? 0xFFFF : 0;
+    // Logged so that hardware testers can check the key mapping.
+    qDebug("Lg320x240: G19: %s %s", di.control, down ? "pressed" : "released");
+    callback(lh_cb_input, (void*) &di);
 }
 
 void LH_Lg320x240::setStatus(const QString &text)

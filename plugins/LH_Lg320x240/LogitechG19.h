@@ -51,6 +51,8 @@ public:
     // Explains a libusb error code to the user.
     static QString errorText(int libusb_error);
     static QString readyText();
+    // Device ID, also used for the G-keys that the plugin reads over HID.
+    static const char *deviceId() { return "Lg320x240-G19"; }
 
     static void LIBUSB_CALL g19_button_cb( struct libusb_transfer * transfer );
     LogitechG19(libusb_context *ctx, libusb_device *usbdev, libusb_device_descriptor *dd, LH_QtObject *parent = 0);
