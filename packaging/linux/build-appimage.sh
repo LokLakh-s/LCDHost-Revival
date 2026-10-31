@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Builds the LCDHost AppImage from a built LCDHost.app, with linuxdeploy and
-# its Qt plugin at pinned versions (checked by SHA-256). Qt, libusb and hidapi
-# are bundled; the udev rules are built into LCDHost, which installs them
-# from the settings of the Logitech plugins.
+# its Qt plugin at pinned versions (checked by SHA-256). Qt and hidapi are
+# bundled; libusb is on the AppImage exclude list and comes from the system.
+# The udev rules are built into LCDHost, which installs them from the
+# settings of the Logitech plugins.
 # Usage: packaging/linux/build-appimage.sh <LCDHost.app> <version> <output dir>
 # Needs qmake of the Qt used for the build in PATH (or QMAKE set).
 set -euo pipefail
@@ -54,6 +55,9 @@ for lib in "$appdir"/usr/bin/*.so; do
 done
 
 export QMAKE=${QMAKE:-$(command -v qmake)}
+# xcb (the default) and offscreen, to run without a display (tests). No
+# Wayland: the X11 input code of LCDHost needs xcb, which XWayland provides.
+export EXTRA_PLATFORM_PLUGINS="libqoffscreen.so"
 export APPIMAGE_EXTRACT_AND_RUN=1 # no FUSE needed
 export LDAI_OUTPUT="$out/LCDHost-$version-x86_64.AppImage"
 export LINUXDEPLOY_OUTPUT_VERSION="$version"
