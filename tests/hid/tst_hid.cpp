@@ -24,6 +24,7 @@
 #include <QtTest>
 #include <QTemporaryDir>
 
+#include "LH_HidDevice.h"
 #include "LH_HidReportInfo.h"
 #include "LH_UdevRules.h"
 #include "Lg160x43Model.h"
@@ -140,6 +141,23 @@ private slots:
         QVERIFY(!LH_HidReportInfo(QByteArray()).isValid());
         QVERIFY(!LH_HidReportInfo(bytes({ 0x75, 0x08, 0x26, 0xFF })).isValid());
         QVERIFY(!LH_HidReportInfo(bytes({ 0xFE, 0x05, 0x10, 0x00 })).isValid());
+    }
+
+    void interfacePaths()
+    {
+        // Two top-level collections of the G19 HID interface, as Windows
+        // names them, and the same interface without collections.
+        const QByteArray col1 = "\\\\?\\hid#vid_046d&pid_c229&mi_01&col01#8&2a6c7f1&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}";
+        const QByteArray col2 = "\\\\?\\hid#vid_046d&pid_c229&mi_01&col02#8&2a6c7f1&0&0001#{4d1e55b2-f16f-11cf-88cb-001111000030}";
+        const QByteArray other = "\\\\?\\HID#VID_046D&PID_C229&MI_01&Col01#8&3b7d802&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}";
+        QCOMPARE(LH_HidDevice::interfacePathOf(col1), LH_HidDevice::interfacePathOf(col2));
+        QCOMPARE(LH_HidDevice::interfacePathOf(col1),
+                 QByteArray("\\\\?\\hid#vid_046d&pid_c229&mi_01#8&2a6c7f1&0"));
+        QVERIFY(LH_HidDevice::interfacePathOf(col1) != LH_HidDevice::interfacePathOf(other));
+        // Linux and single-collection paths are interfaces already.
+        QCOMPARE(LH_HidDevice::interfacePathOf("/dev/hidraw3"), QByteArray("/dev/hidraw3"));
+        const QByteArray single = "\\\\?\\hid#vid_046d&pid_c227#7&1d9f8e2&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}";
+        QCOMPARE(LH_HidDevice::interfacePathOf(single), single);
     }
 
     void models()

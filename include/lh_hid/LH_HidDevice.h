@@ -56,9 +56,10 @@ public:
     // True if one of the top-level collections of the device has this usage.
     // On Linux, a device is a whole HID interface and can have several.
     bool hasUsage(int usage_page, int usage) const;
-    // The path of the HID interface: the device path without the top-level
-    // collection part that Windows adds ("&col02").
-    QByteArray interfacePath() const;
+    // The path of the HID interface, the same for all its top-level
+    // collections: Windows gives each collection its own path.
+    QByteArray interfacePath() const { return interfacePathOf(device_path_); }
+    static QByteArray interfacePathOf(const QByteArray &device_path);
 
     // True while the device is connected, even if it cannot be opened.
     bool present() const { return present_.loadRelaxed() != 0; }

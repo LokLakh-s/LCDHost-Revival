@@ -72,18 +72,28 @@ bool LH_HidDevice::hasUsage(int usage_page, int usage) const
     return usages_.contains(((usage_page & 0xFFFF) << 16) | (usage & 0xFFFF));
 }
 
-QByteArray LH_HidDevice::interfacePath() const
+// On Windows, the path of a top-level collection looks like
+//   \\?\hid#vid_046d&pid_c229&mi_01&col02#8&2a6c7f1&0&0001#{4d1e55b2-...}
+// The collections of an interface differ by "&colNN" in the hardware ID and
+// by the last field of the instance ID: both are dropped.
+QByteArray LH_HidDevice::interfacePathOf(const QByteArray &device_path)
 {
-    QByteArray path(device_path_);
-    int col = path.toLower().indexOf("&col");
-    if(col > 0)
-    {
-        int end = col + 4;
-        while(end < path.size() && isxdigit((unsigned char) path.at(end)))
-            ++end;
-        path.remove(col, end - col);
-    }
-    return path;
+    QList<QByteArray> parts = device_path.split('#');
+    if(parts.size() < 3)
+        return device_path;
+    QByteArray hardware_id = parts.at(1);
+    int col = hardware_id.toLower().indexOf("&col");
+    if(col < 0)
+        return device_path;
+    int end = col + 4;
+    while(end < hardware_id.size() && isxdigit((unsigned char) hardware_id.at(end)))
+        ++end;
+    hardware_id.remove(col, end - col);
+    QByteArray instance_id = parts.at(2);
+    int last = instance_id.lastIndexOf('&');
+    if(last > 0)
+        instance_id.truncate(last);
+    return parts.at(0) + '#' + hardware_id + '#' + instance_id;
 }
 
 // Posts a request to the HID thread and waits for its result. Returns false
