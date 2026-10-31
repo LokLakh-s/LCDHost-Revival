@@ -21,6 +21,7 @@
 #define LOGITECHG19_H
 
 #include <QDateTime>
+#include <QString>
 #include <LH_QtDevice.h>
 #include <libusb.h>
 
@@ -44,6 +45,13 @@ class LogitechG19 : public LH_QtDevice
     volatile quint16 new_buttons_;
 
 public:
+    // Opens the device and claims the display interface, then releases it.
+    // Returns a libusb error code, LIBUSB_SUCCESS if LCDHost can use it.
+    static int probe(libusb_device *usbdev);
+    // Explains a libusb error code to the user.
+    static QString errorText(int libusb_error);
+    static QString readyText();
+
     static void LIBUSB_CALL g19_button_cb( struct libusb_transfer * transfer );
     LogitechG19(libusb_context *ctx, libusb_device *usbdev, libusb_device_descriptor *dd, LH_QtObject *parent = 0);
     ~LogitechG19();
@@ -64,6 +72,8 @@ public:
     const char* close();
     const char* render_qimage(QImage *img);
 
+signals:
+    void statusChanged(const QString &text);
 };
 
 #endif // LOGITECHG19_H

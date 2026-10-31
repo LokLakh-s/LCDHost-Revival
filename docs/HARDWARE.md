@@ -36,7 +36,9 @@ kernel driver `hid-lg-g15` is loaded (it also handles the G-keys and LEDs), so
 nothing needs to be detached. No kernel driver binds the G19 display
 interface, so libusb can claim it directly.
 
-Only permissions are needed. Install the udev rules shipped in
+Only permissions are needed (for the G19, the settings of the *Lg320x240*
+plugin in the **Plugins** tab tell when they are missing). Install the udev
+rules shipped in
 [`packaging/linux/70-lcdhost.rules`](../packaging/linux/70-lcdhost.rules):
 
 ```sh

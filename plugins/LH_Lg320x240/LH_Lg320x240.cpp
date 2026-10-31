@@ -20,20 +20,14 @@
   */
 
 #include <QtGlobal>
-#include <QDateTime>
-#include <QFile>
 #include <QDebug>
-#include <QCoreApplication>
 #include <QTimerEvent>
-#include <QThread>
 
-#ifdef Q_OS_WIN
-# include <windows.h>
-#endif
+#include <libusb.h>
 
 #include "LH_QtDevice.h"
+#include "LH_Qt_QString.h"
 #include "LH_Lg320x240.h"
-#include "LH_Qt_QImage.h"
 #include "LogitechG19.h"
 
 LH_PLUGIN(LH_Lg320x240)
@@ -60,26 +54,37 @@ char __lcdhostplugin_xml[] =
   "</longdesc>"
 "</lcdhostplugin>";
 
+static const char hardware_guide_url[] =
+        "https://github.com/LokLakh-s/LCDHost-Revival/blob/master/docs/HARDWARE.md";
+
 LH_Lg320x240::LH_Lg320x240() :
     LH_QtPlugin(),
     timer_id_(0),
     usb_ctx_(0),
-    usb_device_list_(0)
+    setup_status_(0)
 {
 }
 
 const char *LH_Lg320x240::userInit()
 {
-#ifdef Q_OS_WIN
-    // make sure neither LCDMon.exe nor LCORE.EXE is running on Windows
-    if( FindWindowA( "Logitech LCD Monitor Window", "LCDMon" ) ||
-        FindWindowA( "QWidget", "LCore" ) )
-        return "Logitech drivers are loaded";
-#endif
+    const int info_flags = LH_FLAG_NOSAVE_DATA | LH_FLAG_NOSAVE_LINK | LH_FLAG_NOSOURCE | LH_FLAG_NOSINK;
+
+    setup_status_ = new LH_Qt_QString(this, "Status", "Looking for a G19...",
+                                      info_flags, lh_type_string_html);
+    new LH_Qt_QString(this, "~guide",
+                      QString("<a href=\"%1\">Hardware setup guide</a>").arg(hardware_guide_url),
+                      info_flags | LH_FLAG_HIDETITLE, lh_type_string_html);
+
     if(!usb_ctx_)
     {
-        if(libusb_init(&usb_ctx_) || !usb_ctx_)
-            return "libusb_init() failed";
+        int retv = libusb_init(&usb_ctx_);
+        if(retv != LIBUSB_SUCCESS)
+        {
+            usb_ctx_ = 0;
+            setStatus(QString("USB access is not available (libusb: %1).")
+                      .arg(QString::fromLatin1(libusb_error_name(retv))));
+            return NULL;
+        }
         libusb_set_option(usb_ctx_, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_ERROR);
     }
 
@@ -96,8 +101,7 @@ void LH_Lg320x240::userTerm()
         killTimer(timer_id_);
         timer_id_ = 0;
     }
-    if(usb_device_list_)
-        qCritical("LH_Lg320x240::userTerm(): device enumeration in progress");
+    closeDevice();
     if(usb_ctx_)
     {
         libusb_exit(usb_ctx_);
@@ -105,40 +109,61 @@ void LH_Lg320x240::userTerm()
     }
 }
 
+void LH_Lg320x240::setStatus(const QString &text)
+{
+    if(setup_status_ && setup_status_->value() != text)
+    {
+        qDebug("Lg320x240: %s", qPrintable(text));
+        setup_status_->setValue(text);
+    }
+}
+
+void LH_Lg320x240::closeDevice()
+{
+    if(LogitechG19 *g19 = findChild<LogitechG19 *>())
+    {
+        g19->userTerm();
+        delete g19;
+    }
+}
+
 void LH_Lg320x240::timerEvent(QTimerEvent *ev)
 {
-    if(usb_ctx_ && !usb_device_list_ && ev->timerId() == timer_id_)
+    if(!usb_ctx_ || ev->timerId() != timer_id_)
+        return;
+    // A present device reports its own state.
+    if(findChild<LogitechG19 *>())
+        return;
+
+    libusb_device **list = 0;
+    libusb_device *usbdev = 0;
+    struct libusb_device_descriptor dd;
+    ssize_t count = libusb_get_device_list(usb_ctx_, &list);
+    for(ssize_t i = 0; i < count && !usbdev; ++i)
     {
-        LogitechG19 *g19 = findChild<LogitechG19 *>();
-
-        if(g19)
-            return;
-
-        int usb_device_count = libusb_get_device_list(usb_ctx_, &usb_device_list_);
-        if(usb_device_list_)
-        {
-            struct libusb_device_descriptor dd;
-            memset(&dd, 0, sizeof(dd));
-            for(int i = 0; i < usb_device_count; ++i)
-            {
-                if(usb_device_list_[i])
-                {
-                    if (!g19 &&
-                            !libusb_get_device_descriptor(usb_device_list_[i], &dd) &&
-                            dd.idVendor == 0x046d &&
-                            dd.idProduct == 0xc229)
-                    {
-                        g19 = new LogitechG19(usb_ctx_, usb_device_list_[i], &dd, this);
-                    }
-                    else
-                    {
-                        libusb_unref_device(usb_device_list_[i]);
-                    }
-                    usb_device_list_[i] = 0;
-                }
-            }
-            libusb_free_device_list(usb_device_list_, 0);
-            usb_device_list_ = 0;
-        }
+        if(!libusb_get_device_descriptor(list[i], &dd) &&
+                dd.idVendor == 0x046d && dd.idProduct == 0xc229)
+            usbdev = libusb_ref_device(list[i]);
     }
+    if(list)
+        libusb_free_device_list(list, 1);
+
+    if(!usbdev)
+    {
+        setStatus("No G19 connected.");
+        return;
+    }
+
+    // Only offer the display when LCDHost can actually use it, and say why not.
+    int retv = LogitechG19::probe(usbdev);
+    if(retv != LIBUSB_SUCCESS)
+    {
+        setStatus(LogitechG19::errorText(retv));
+        libusb_unref_device(usbdev);
+        return;
+    }
+
+    LogitechG19 *g19 = new LogitechG19(usb_ctx_, usbdev, &dd, this);
+    connect(g19, SIGNAL(statusChanged(QString)), this, SLOT(setStatus(QString)));
+    setStatus(LogitechG19::readyText());
 }

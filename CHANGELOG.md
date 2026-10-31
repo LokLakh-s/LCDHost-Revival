@@ -10,6 +10,10 @@ Versions up to 0.0.38 were released by the original author; see the
 
 ### Added
 
+- G19: the plugin settings show whether LCDHost can use the G19 and, if not,
+  why (not connected, WinUSB driver missing, no permission, display used by
+  another program). The G19 is offered in the Output tab only once LCDHost
+  can use it.
 - Releases: pushing a version tag makes the CI publish a GitHub release
   with the Windows and Linux archives, SHA-256 checksums and the
   changelog section as notes.
@@ -22,6 +26,9 @@ Versions up to 0.0.38 were released by the original author; see the
 - Linux: the hints logged when the G19 or a HID device is not accessible
   point to the LCDHost udev rules instead of suggesting a world-writable
   device.
+- Links in plugin settings can be clicked, and long texts wrap.
+- G19: LCDHost no longer refuses to look for the G19 while Logitech Gaming
+  Software runs; the status tells when the display is not available.
 
 ### Fixed
 

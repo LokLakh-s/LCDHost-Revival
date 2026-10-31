@@ -85,8 +85,9 @@ See [docs/HARDWARE.md](docs/HARDWARE.md) for the current setup steps.
   G-keys / M-keys as layout inputs.
 - ⬜ Make the proprietary Logitech LCD SDK plugin (`LgLcdMan`) optional and
   off by default; keep it only for users who want to stay on LGS.
-- ⬜ Clear messages when the device is busy (LGS or G HUB running) or the
-  driver or permissions are missing.
+- 🚧 Clear messages when the device is busy (LGS or G HUB running) or the
+  driver or permissions are missing: done for the G19 (status in the plugin
+  settings), still to do for the HID devices.
 - ⬜ Linux packages (AppImage or Flatpak, and distribution packages) that
   install the udev rules.
 

@@ -23,6 +23,57 @@
 
 int LogitechG19::g19_event_ = QEvent::registerEventType();
 
+static const int g19_display_interface = 0;
+
+int LogitechG19::probe(libusb_device *usbdev)
+{
+    libusb_device_handle *handle = 0;
+    int retv = libusb_open(usbdev, &handle);
+    if(retv == LIBUSB_SUCCESS)
+    {
+        libusb_set_auto_detach_kernel_driver(handle, 1);
+        retv = libusb_claim_interface(handle, g19_display_interface);
+        if(retv == LIBUSB_SUCCESS)
+            libusb_release_interface(handle, g19_display_interface);
+        libusb_close(handle);
+    }
+    return retv;
+}
+
+QString LogitechG19::errorText(int libusb_error)
+{
+    switch(libusb_error)
+    {
+    case LIBUSB_SUCCESS:
+        return QString();
+#ifdef Q_OS_WIN
+    case LIBUSB_ERROR_NOT_SUPPORTED:
+    case LIBUSB_ERROR_NOT_FOUND:
+        return "G19 found, but its display does not use the WinUSB driver: see the hardware setup guide.";
+    case LIBUSB_ERROR_ACCESS:
+    case LIBUSB_ERROR_BUSY:
+        return "G19 found, but another program is using its display (Logitech Gaming Software?). "
+               "LCDHost retries once it is closed.";
+#else
+    case LIBUSB_ERROR_ACCESS:
+        return "G19 found, but LCDHost has no permission to use it: install the LCDHost udev rules, "
+               "then unplug and replug the keyboard.";
+    case LIBUSB_ERROR_BUSY:
+        return "G19 found, but another program is using its display. LCDHost retries once it is closed.";
+#endif
+    case LIBUSB_ERROR_NO_DEVICE:
+        return "The G19 was unplugged.";
+    default:
+        return QString("G19 found, but LCDHost cannot use it (libusb: %1).")
+                .arg(QString::fromLatin1(libusb_error_name(libusb_error)));
+    }
+}
+
+QString LogitechG19::readyText()
+{
+    return "G19 ready: select it in the Output tab.";
+}
+
 void LIBUSB_CALL LogitechG19::g19_button_cb( struct libusb_transfer * transfer )
 {
     if( transfer && transfer->user_data )
@@ -139,42 +190,20 @@ const char* LogitechG19::open()
     button_completed_ = 1;
 
     retv = libusb_open(usbdev_, &lcdhandle_);
-
-    switch(retv)
+    if(retv == LIBUSB_SUCCESS)
     {
-    case LIBUSB_SUCCESS:
         Q_ASSERT(lcdhandle_ != 0);
+        libusb_set_auto_detach_kernel_driver(lcdhandle_, 1);
         if(libusb_get_configuration(lcdhandle_, &cfg) || cfg != 1)
             libusb_set_configuration(lcdhandle_, 1);
         retv = libusb_claim_interface(lcdhandle_, lcd_if_number_);
         if(retv == LIBUSB_SUCCESS)
         {
-#if 0
-            button_transfer_ = libusb_alloc_transfer( 0 );
-            libusb_fill_interrupt_transfer(
-                        button_transfer_,
-                        lcdhandle_,
-                        endpoint_in_,
-                        (unsigned char*) &new_buttons_,
-                        sizeof(new_buttons_),
-                        g19_button_cb,
-                        this, 60000
-                        );
-            libusb_submit_transfer( button_transfer_ );
-#endif
             button_completed_ = 0;
             QCoreApplication::postEvent(this, new QEvent((QEvent::Type)g19_event_));
+            emit statusChanged("G19 in use by LCDHost.");
             return NULL;
         }
-        break;
-    case LIBUSB_ERROR_ACCESS:
-#ifdef Q_OS_LINUX
-        qDebug("No permission to use the G19: install the LCDHost udev rules "
-               "(packaging/linux/70-lcdhost.rules, see docs/HARDWARE.md)");
-#endif
-        break;
-    default:
-        break;
     }
 
     if (lcdhandle_) {
@@ -182,12 +211,9 @@ const char* LogitechG19::open()
         lcdhandle_ = 0;
     }
 
+    emit statusChanged(errorText(retv));
     const char* error_text = libusb_error_name(retv);
-    if (!error_text)
-        error_text = "Unknown libusb error";
-
-    // qDebug("Failed to open G19: %s\n", error_text);
-    return error_text;
+    return error_text ? error_text : "Unknown libusb error";
 }
 
 const char* LogitechG19::close()
@@ -206,6 +232,7 @@ const char* LogitechG19::close()
         libusb_release_interface(lcdhandle_, lcd_if_number_);
         libusb_close( lcdhandle_ );
         lcdhandle_ = 0;
+        emit statusChanged(readyText());
     }
     return NULL;
 }
@@ -303,6 +330,7 @@ const char* LogitechG19::render_qimage(QImage *img)
     if( usberr || len != sizeof(lcd_buffer) )
     {
         userTerm();
+        emit statusChanged(errorText(usberr ? usberr : LIBUSB_ERROR_IO));
         qDebug() << "LogitechG19::render_qimage():" << libusb_error_name((libusb_error)usberr);
         deleteLater();
         return libusb_error_name((libusb_error)usberr);
@@ -336,6 +364,7 @@ void LogitechG19::customEvent(QEvent *ev)
             return;
         }
         userTerm();
+        emit statusChanged(errorText(usb_result));
         qWarning("LogitechG19: libusb error %s", libusb_error_name(usb_result));
         deleteLater();
         return;

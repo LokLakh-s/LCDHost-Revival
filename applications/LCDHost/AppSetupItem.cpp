@@ -537,6 +537,8 @@ QWidget *AppSetupItem::valueWidget( QWidget *parent )
         {
             QLabel *w = new QLabel(parent);
             w->setTextFormat( Qt::RichText );
+            w->setWordWrap( true );
+            w->setOpenExternalLinks( true );
             connect( this, SIGNAL(setText(QString)), w, SLOT(setText(QString)) );
             retv = w;
         }

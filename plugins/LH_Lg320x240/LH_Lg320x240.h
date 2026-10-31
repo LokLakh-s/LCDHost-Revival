@@ -23,11 +23,11 @@
 #define LH_LG320x240_H
 
 #include <QEvent>
+#include <QString>
 #include <LH_QtPlugin.h>
 
 typedef struct libusb_context libusb_context;
-typedef struct libusb_device libusb_device;
-class LogitechG19;
+class LH_Qt_QString;
 
 class LH_Lg320x240 : public LH_QtPlugin
 {
@@ -35,13 +35,18 @@ class LH_Lg320x240 : public LH_QtPlugin
 
     int timer_id_;
     libusb_context *usb_ctx_;
-    libusb_device **usb_device_list_;
+    LH_Qt_QString *setup_status_;
+
+    void closeDevice();
 
 public:
     LH_Lg320x240();
     const char *userInit();
     void userTerm();
     void timerEvent(QTimerEvent *ev);
+
+public slots:
+    void setStatus(const QString &text);
 };
 
 #endif // LH_LG320x240_H
