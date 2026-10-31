@@ -1,5 +1,6 @@
 /*
   Copyright (c) 2009-2016 Johan Lindh <johan@linkdata.se>
+  Copyright (c) 2026 The LCDHost Revival contributors
 
   This file is part of LCDHost.
 
@@ -23,29 +24,46 @@
 #include "LH_QtDevice.h"
 
 class LH_HidDevice;
+struct Lg160x43Model;
 
+// A Logitech 160x43 LCD. On Windows, the LCD and the keys can be in
+// different top-level collections of the HID interface, so they can come
+// from two LH_HidDevice objects.
 class Lg160x43Device : public LH_QtDevice
 {
     Q_OBJECT
 
-    LH_HidDevice *hd_;
-    unsigned char output_report_id_;
+    const Lg160x43Model *model_;
+    LH_HidDevice *lcd_;
+    LH_HidDevice *keys_;
+    quint64 pressed_;
+    bool opened_;
 
 public:
-    Lg160x43Device(LH_HidDevice *hi, int output_report_id, LH_QtPlugin *drv = 0);
+    Lg160x43Device(const Lg160x43Model *model, LH_HidDevice *lcd,
+                   const QString &devid, LH_QtPlugin *drv);
+    ~Lg160x43Device();
 
-    const char* open() { return NULL; }
-    const char* render_argb32(int,int,const void*) { return NULL; }
-    const char* render_mono(int,int,const void*) { return NULL; }
-    int buttons() { return 0; }
-    const char* get_backlight(lh_device_backlight*) { return NULL; }
-    const char* set_backlight(lh_device_backlight*) { return NULL; }
-    const char* close() { return NULL; }
+    const Lg160x43Model *model() const { return model_; }
+    LH_HidDevice *lcd() const { return lcd_; }
+    LH_HidDevice *keys() const { return keys_; }
+    // Starts reporting the keys of hd (0: stop).
+    void setKeys(LH_HidDevice *hd);
+    // True while LCDHost renders to the device.
+    bool isOpen() const { return opened_; }
 
+    const char* open();
     const char* render_qimage(QImage *img);
+    const char* close();
+
+signals:
+    void openChanged();
 
 public slots:
-    void onlineChanged(bool b);
+    void inputReport(const QByteArray &report);
+
+private:
+    void sendKey(int index, bool down);
 };
 
 #endif // LG160X43DEVICE_H

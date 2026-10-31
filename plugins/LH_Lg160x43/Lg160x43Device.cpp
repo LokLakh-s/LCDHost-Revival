@@ -1,5 +1,6 @@
 /*
   Copyright (c) 2009-2016 Johan Lindh <johan@linkdata.se>
+  Copyright (c) 2026 The LCDHost Revival contributors
 
   This file is part of LCDHost.
 
@@ -19,41 +20,103 @@
 
 
 #include "Lg160x43Device.h"
+#include "Lg160x43Model.h"
 #include "LH_HidDevice.h"
 
 #include <QImage>
+#include <QtDebug>
 
 enum
 {
-        G15_KEY_READ_LENGTH = 9,/* largest input report size */
         G15_LCD_OFFSET = 32,	/* offset in output report where pixels start */
         G15_LCD_HEIGHT = 43,	/* LCD vertical height in pixels */
         G15_LCD_WIDTH = 160,	/* LCD horizontal width in pixels */
         G15_BUFFER_LEN = 0x03e0	/* total length of the HID output report */
 };
 
-Lg160x43Device::Lg160x43Device(LH_HidDevice *hi, int output_report_id, LH_QtPlugin *drv) :
+Lg160x43Device::Lg160x43Device(const Lg160x43Model *model, LH_HidDevice *lcd,
+                               const QString &devid, LH_QtPlugin *drv) :
     LH_QtDevice(drv),
-    hd_(hi),
-    output_report_id_((unsigned char)output_report_id)
+    model_(model),
+    lcd_(lcd),
+    keys_(0),
+    pressed_(0),
+    opened_(false)
 {
-    setDevid(hi->objectName());
-    setName(hi->product_text());
-    setSize(160,43);
+    setDevid(devid);
+    setName(QString::fromLatin1(model->name));
+    setSize(G15_LCD_WIDTH, G15_LCD_HEIGHT);
     setDepth(1);
     setAutoselect(true);
-    connect(hd_, SIGNAL(onlineChanged(bool)), this, SLOT(onlineChanged(bool)));
     arrive();
 }
 
-void Lg160x43Device::onlineChanged(bool b)
+Lg160x43Device::~Lg160x43Device()
 {
-    if(hd_ && ! b)
+    setKeys(0);
+}
+
+void Lg160x43Device::setKeys(LH_HidDevice *hd)
+{
+    if(hd == keys_)
+        return;
+    if(keys_)
     {
-        hd_ = 0;
-        leave();
-        deleteLater();
+        disconnect(keys_, 0, this, 0);
+        keys_->listen(false);
+        // Release what was held down, so that layouts do not see stuck keys.
+        for(int i = 0; i < model_->key_count && i < 64; ++i)
+            if(pressed_ & (quint64(1) << i))
+                sendKey(i, false);
+        pressed_ = 0;
     }
+    keys_ = hd;
+    if(keys_)
+    {
+        connect(keys_, SIGNAL(inputReport(QByteArray)), this, SLOT(inputReport(QByteArray)));
+        keys_->listen(true);
+    }
+}
+
+void Lg160x43Device::inputReport(const QByteArray &report)
+{
+    quint64 pressed = 0;
+    if(!model_->decodeKeys(report, &pressed) || pressed == pressed_)
+        return;
+    for(int i = 0; i < model_->key_count && i < 64; ++i)
+    {
+        quint64 mask = quint64(1) << i;
+        if((pressed & mask) != (pressed_ & mask))
+            sendKey(i, (pressed & mask) != 0);
+    }
+    pressed_ = pressed;
+}
+
+void Lg160x43Device::sendKey(int index, bool down)
+{
+    lh_device_input di;
+    di.devid = lh_dev()->devid;
+    di.control = model_->keys[index].name;
+    di.item = index + 1; // must not be zero
+    di.flags = lh_df_button | (down ? lh_df_down : lh_df_up);
+    di.value = down ? 0xFFFF : 0;
+    // Logged so that hardware testers can check the key mapping.
+    qDebug("Lg160x43: %s: %s %s", model_->name, di.control, down ? "pressed" : "released");
+    callback(lh_cb_input, (void*) &di);
+}
+
+const char* Lg160x43Device::open()
+{
+    opened_ = true;
+    emit openChanged();
+    return NULL;
+}
+
+const char* Lg160x43Device::close()
+{
+    opened_ = false;
+    emit openChanged();
+    return NULL;
 }
 
 static void make_output_report(unsigned char *lcd_buffer, unsigned char const *data)
@@ -95,7 +158,7 @@ static void make_output_report(unsigned char *lcd_buffer, unsigned char const *d
 
 const char* Lg160x43Device::render_qimage(QImage *img)
 {
-    if(img && hd_ && hd_->online())
+    if(img && lcd_ && lcd_->online())
     {
         unsigned char buffer[G15_BUFFER_LEN];
         if( img->depth() == 1 )
@@ -105,8 +168,8 @@ const char* Lg160x43Device::render_qimage(QImage *img)
             QImage tmp = img->convertToFormat(QImage::Format_Mono,Qt::ThresholdDither|Qt::NoOpaqueDetection);
             make_output_report( buffer, tmp.bits() );
         }
-        buffer[0] = output_report_id_;
-        hd_->write(QByteArray((char*)buffer, sizeof(buffer)));
+        buffer[0] = (unsigned char) model_->lcd_report_id;
+        lcd_->write(QByteArray((char*)buffer, sizeof(buffer)));
     }
     return 0;
 }
