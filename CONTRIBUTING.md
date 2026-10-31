@@ -81,6 +81,20 @@ changes.
 - A blank line, then a body explaining what changed and why, wrapped at 72
   characters.
 
+## Releases
+
+Maintainers release from `master`:
+
+1. Move the `Unreleased` entries of [CHANGELOG.md](CHANGELOG.md) to a new
+   `## [x.y.z] - YYYY-MM-DD` section and update the links at the bottom.
+2. Set `LH_VERSION` in `qmakecache/qmakecache.pro` and update
+   `applications/LCDHost/whatsnew.html`.
+3. Commit ("Release x.y.z"), tag the commit `vx.y.z`, then push the commit
+   and the tag. The CI builds both platforms and publishes the GitHub
+   release: the archives, `SHA256SUMS`, and the changelog section as notes
+   (see `packaging/release/`). It refuses a tag that does not match
+   `LH_VERSION` or has no changelog section.
+
 ## Licensing of contributions
 
 LCDHost is licensed under the [GNU GPL v3 or later](COPYING). By submitting a

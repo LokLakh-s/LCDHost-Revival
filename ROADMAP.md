@@ -99,7 +99,9 @@ See [docs/HARDWARE.md](docs/HARDWARE.md) for the current setup steps.
 
 ## Phase 5: Releases and quality
 
-- ⬜ Tagged releases with a changelog, checksums and a Windows installer.
+- ✅ Releases built and published by the CI from a version tag, with the
+  changelog as release notes and SHA-256 checksums.
+- ⬜ A Windows installer.
 - ⬜ An optional, safe update notifier: check GitHub releases over HTTPS and
   tell the user, never download or run code automatically.
 - ⬜ Automated tests for layout loading and saving, setup items and plugin

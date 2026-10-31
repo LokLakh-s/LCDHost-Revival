@@ -8,6 +8,17 @@ Versions up to 0.0.38 were released by the original author; see the
 
 ## [Unreleased]
 
+### Added
+
+- Releases: pushing a version tag makes the CI publish a GitHub release
+  with the Windows and Linux archives, SHA-256 checksums and the
+  changelog section as notes.
+
+### Removed
+
+- A Qt installer log committed by mistake, and the linker's `.lib`/`.exp`
+  files from the Windows build.
+
 ## [0.1.0] - 2026-09-27
 
 ### Changed

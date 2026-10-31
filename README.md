@@ -35,10 +35,12 @@ date. See the [roadmap](ROADMAP.md).
 
 ## Getting LCDHost
 
-There is no release yet. Every build of `master` produces ready-to-run
-folders for Windows x64 and Linux x64: open the latest successful
-[build run](https://github.com/LokLakh-s/LCDHost-Revival/actions/workflows/build.yml)
-and download `LCDHost-windows-x64` or `LCDHost-linux-x64`.
+Download the latest version for Windows x64 or Linux x64 from the
+[releases page](https://github.com/LokLakh-s/LCDHost-Revival/releases); the
+release notes explain what each archive needs. Builds of every `master`
+commit are also available from the
+[build runs](https://github.com/LokLakh-s/LCDHost-Revival/actions/workflows/build.yml)
+(`LCDHost-windows-x64` and `LCDHost-linux-x64`, GitHub sign-in required).
 
 On first start:
 
