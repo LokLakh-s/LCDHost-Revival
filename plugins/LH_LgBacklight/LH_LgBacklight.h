@@ -2,6 +2,7 @@
   \file     LH_Lg160x43.h
   @author   Johan Lindh <johan@linkdata.se>
   Copyright (c) 2009-2011, Johan Lindh
+  Copyright (c) 2026 The LCDHost Revival contributors
 
   This file is part of LCDHost.
 
@@ -22,6 +23,11 @@
 #ifndef LH_LGBACKLIGHT_H
 #define LH_LGBACKLIGHT_H
 
+#include <QHash>
+#include <QList>
+#include <QPair>
+#include <QString>
+
 #include "LH_QtPlugin.h"
 #include "LH_Qt_QString.h"
 #include "LH_Qt_QStringList.h"
@@ -36,20 +42,27 @@ class LH_LgBacklight : public LH_QtPlugin
 {
     Q_OBJECT
 
+    LH_Qt_QString *status_;
     LH_Qt_QStringList *devselect_;
     LH_Qt_QColor *devcolor_;
     LH_Qt_QColor *allcolor_;
     LH_Qt_int *poll_interval_;
+    int poll_timer_id_;
 
     QList<LgBacklightDevice *> dev_list_;
+    QHash<LH_HidDevice *, LgBacklightDevice *> devices_;
+    // Devices with a backlight that could not be opened: errno (Linux) and text.
+    QHash<LH_HidDevice *, QPair<int, QString> > errors_;
 
 public:
     LH_LgBacklight() :
         LH_QtPlugin(),
+        status_(0),
         devselect_(0),
         devcolor_(0),
         allcolor_(0),
-        poll_interval_(0)
+        poll_interval_(0),
+        poll_timer_id_(0)
     {}
     const char *userInit();
     void userTerm();
@@ -64,6 +77,9 @@ public slots:
     void changeColor();
     void setAllColor();
     void pollIntervalChanged();
+
+private:
+    void refreshStatus();
 };
 
 #endif // LH_LGBACKLIGHT_H

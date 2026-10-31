@@ -2,6 +2,7 @@
   \file     LH_Lg160x43.cpp
   @author   Johan Lindh <johan@linkdata.se>
   Copyright (c) 2009-2011, Johan Lindh
+  Copyright (c) 2026 The LCDHost Revival contributors
 
   This file is part of LCDHost.
 
@@ -22,7 +23,15 @@
 #include "LH_LgBacklight.h"
 #include "LgBacklightDevice.h"
 #include "LH_HidDevice.h"
+#include "LH_HidReportInfo.h"
+
 #include <QDebug>
+#include <QtAlgorithms>
+#include <algorithm>
+#include <QStringList>
+#include <QTimerEvent>
+
+#include <errno.h>
 
 LH_PLUGIN(LH_LgBacklight)
 
@@ -40,8 +49,9 @@ char __lcdhostplugin_xml[] =
   "Logitech device backlight control via HID"
   "</shortdesc>"
   "<longdesc>"
-"<p>HID-level driver for Logitech backlit devices, such as G13, G15 or G19. "
-"Note that to use this driver you may need to uninstall existing drivers for these devices.</p>"
+"<p>HID-level backlight control for Logitech keyboards: colour on the G13, G19 and G510, "
+"off, dim or bright on the G11 and G15. No driver needs to be installed; on Linux, install the "
+"LCDHost udev rules (see <a href=\"https://github.com/LokLakh-s/LCDHost-Revival/blob/master/docs/HARDWARE.md\">docs/HARDWARE.md</a>).</p>"
 "<p>To set the backlight for all connected devices from a layout, create a <i>data source</i> named "
 "<tt>/plugin/backlight/all/set</tt> using the link button <img src=\":/LH_Backlight/source.png\"></img> at any color item.</p>"
   "</longdesc>"
@@ -50,6 +60,8 @@ char __lcdhostplugin_xml[] =
 const char *LH_LgBacklight::userInit()
 {
     if( const char *err = LH_QtPlugin::userInit() ) return err;
+    status_ = new LH_Qt_QString( this, "Status", QString("Looking for a %1...").arg(LgBacklightModel::supportedText()),
+                                 LH_FLAG_NOSAVE_DATA|LH_FLAG_NOSAVE_LINK|LH_FLAG_NOSOURCE|LH_FLAG_NOSINK, lh_type_string_html );
     devselect_ = new LH_Qt_QStringList( this, "Device", QStringList(), LH_FLAG_NOSAVE_DATA|LH_FLAG_NOSAVE_LINK|LH_FLAG_NOSOURCE|LH_FLAG_NOSINK|LH_FLAG_HIDDEN );
     devselect_->setHelp( "The device which backlight you want to control." );
     connect( devselect_, SIGNAL(changed()), this, SLOT(changeDev()) );
@@ -73,43 +85,107 @@ const char *LH_LgBacklight::userInit()
 
 void LH_LgBacklight::userTerm()
 {
+    if(poll_timer_id_)
+    {
+        killTimer(poll_timer_id_);
+        poll_timer_id_ = 0;
+    }
 }
 
-void LH_LgBacklight::timerEvent(QTimerEvent*) {
+void LH_LgBacklight::timerEvent(QTimerEvent *ev) {
+    if(ev->timerId() != poll_timer_id_)
+        return;
     if(devselect_->index() >= 0 && devselect_->index() < dev_list_.size())
         if(LgBacklightDevice *bld = dev_list_.at(devselect_->index()))
             if (bld->hd()->online())
                 devcolor_->setValue(bld->getDeviceColor());
+    refreshStatus();
 }
 
 void LH_LgBacklight::pollIntervalChanged() {
-    startTimer(poll_interval_->value());
+    if(poll_timer_id_)
+        killTimer(poll_timer_id_);
+    poll_timer_id_ = startTimer(poll_interval_->value());
 }
 
 void LH_LgBacklight::onlineChanged(LH_HidDevice *hd, bool b)
 {
-    Q_UNUSED(b);
-    LgBacklightDevice *bld = 0;
-    if(hd->vendor_id() == 0x046d)
+    const LgBacklightModel *model = LgBacklightModel::find(hd->vendor_id(), hd->product_id());
+    if(!model)
+        return;
+
+    if(!b)
     {
-        switch(hd->product_id())
-        {
-        case 0xC225: /* G11 */
-        case 0xC227: /* G15v2 */
-        case 0xC21C: /* G13 */
-        case 0xC22D: /* G510 without audio */
-        case 0xC22E: /* G510 with audio */
-        case 0xC229: /* G19 */
-            bld = findChild<LgBacklightDevice *>(hd->objectName());
-            if(bld == 0) {
-                bld = new LgBacklightDevice(hd, this);
-                connect(bld, SIGNAL(colorChanged()), this, SLOT(colorChanged()));
-            }
-            break;
-        }
-    }
-    if(bld)
+        delete devices_.take(hd);
         refreshList();
+        return;
+    }
+    if(devices_.contains(hd))
+        return;
+
+    // Only the HID interface (Linux) or top-level collection (Windows) that
+    // declares the backlight report. Without a descriptor (a collection that
+    // cannot be opened on Windows), only the vendor-defined one.
+    LH_HidReportInfo info = hd->reportInfo();
+    int report_size = model->report_size;
+    if(info.isValid())
+    {
+        if(!info.has(LH_HidReportInfo::Feature, model->report_id))
+            return;
+        report_size = info.size(LH_HidReportInfo::Feature, model->report_id);
+    }
+    else if(!hd->hasUsage(0xFF00, 0x0000))
+        return;
+
+    QString error_text;
+    int error_code = 0;
+    if(!hd->open(&error_text, &error_code))
+    {
+        errors_.insert(hd, qMakePair(error_code, error_text));
+        refreshStatus();
+        return;
+    }
+    errors_.remove(hd);
+
+    LgBacklightDevice *bld = new LgBacklightDevice(hd, model, report_size, this);
+    connect(bld, SIGNAL(colorChanged()), this, SLOT(colorChanged()));
+    devices_.insert(hd, bld);
+    refreshList();
+}
+
+void LH_LgBacklight::refreshStatus()
+{
+    QStringList lines;
+    foreach(LH_HidDevice *hd, errors_.keys())
+    {
+        if(!hd->present())
+        {
+            errors_.remove(hd);
+            continue;
+        }
+        const LgBacklightModel *model = LgBacklightModel::find(hd->vendor_id(), hd->product_id());
+        const QPair<int, QString> error = errors_.value(hd);
+#ifdef Q_OS_LINUX
+        if(error.first == EACCES || error.first == EPERM)
+        {
+            lines << QString("%1 found, but LCDHost has no permission to use it: "
+                             "install the LCDHost udev rules (see docs/HARDWARE.md).").arg(model->name);
+            continue;
+        }
+#endif
+        lines << QString("%1 found, but LCDHost cannot open it (%2).")
+                 .arg(model->name).arg(error.second.toHtmlEscaped());
+    }
+    if(!dev_list_.isEmpty())
+        lines.prepend(QString("%1 found.").arg(QStringList(devselect_->list()).join(", ")));
+    if(lines.isEmpty())
+        lines << QString("No %1 connected.").arg(LgBacklightModel::supportedText());
+    const QString text = lines.join("<br/>");
+    if(status_ && status_->value() != text)
+    {
+        qDebug("LgBacklight: %s", qPrintable(text));
+        status_->setValue(text);
+    }
 }
 
 void LH_LgBacklight::colorChanged() {
@@ -125,12 +201,11 @@ void LH_LgBacklight::refreshList()
     if(devselect_->index() >= 0 && devselect_->index() < dev_list_.size())
         current_bld = dev_list_.value(devselect_->index());
 
-    dev_list_.clear();
-    foreach(LgBacklightDevice *bld, findChildren<LgBacklightDevice *>())
-    {
-        if(bld->hd()->online())
-            dev_list_.append(bld);
-    }
+    dev_list_ = devices_.values();
+    std::sort(dev_list_.begin(), dev_list_.end(),
+              [](const LgBacklightDevice *a, const LgBacklightDevice *b) {
+                  return qstrcmp(a->model()->name, b->model()->name) < 0;
+              });
 
     if(! dev_list_.contains(current_bld))
         current_bld = dev_list_.isEmpty() ? 0 : dev_list_.first();
@@ -141,7 +216,7 @@ void LH_LgBacklight::refreshList()
     {
         if(bld == current_bld)
             bld_index = sl.size();
-        sl.append(bld->hd()->product_text());
+        sl.append(QString::fromLatin1(bld->model()->name));
     }
 
     devselect_->setVisible(sl.size() > 0);
@@ -149,7 +224,7 @@ void LH_LgBacklight::refreshList()
     devselect_->setList(sl);
     devselect_->setIndex(bld_index);
     devcolor_->setValue(current_bld ? current_bld->color() : QColor(Qt::transparent));
-
+    refreshStatus();
     return;
 }
 
@@ -163,13 +238,11 @@ void LH_LgBacklight::changeColor()
 {
     if(devselect_->index() >= 0 && devselect_->index() < dev_list_.size())
         if(LgBacklightDevice *bld = dev_list_.at(devselect_->index()))
-            if(bld->setDeviceColor(devcolor_->value()))
-                bld->setColor(devcolor_->value());
+            bld->setColor(devcolor_->value());
 }
 
 void LH_LgBacklight::setAllColor()
 {
     foreach(LgBacklightDevice *bld, dev_list_)
-        if(bld->setDeviceColor(allcolor_->value()))
-            bld->setColor(allcolor_->value());
+        bld->setColor(allcolor_->value());
 }
