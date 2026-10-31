@@ -38,6 +38,7 @@
 #include "LH_HidDevice.h"
 #include "LH_HidReportInfo.h"
 #include "LH_Qt_QString.h"
+#include "LgUdevSetup.h"
 
 LH_PLUGIN(LH_Lg160x43)
 
@@ -57,7 +58,7 @@ char __lcdhostplugin_xml[] =
   "<longdesc>"
     "HID-level driver for the Logitech devices with a 160x43 LCD: G13, G15, G15 v2, G510 and Z-10. "
     "It also reports their G-keys, M-keys and LCD buttons to layouts.<br/>"
-    "No driver needs to be installed. On Linux, install the LCDHost udev rules. "
+    "No driver needs to be installed. On Linux, use <i>Install udev rules</i> in the settings of this plugin. "
     "See <a href=\"https://github.com/LokLakh-s/LCDHost-Revival/blob/master/docs/HARDWARE.md\">docs/HARDWARE.md</a>."
   "</longdesc>"
 "</lcdhostplugin>";
@@ -79,6 +80,7 @@ const char *LH_Lg160x43::userInit()
     setup_status_ = new LH_Qt_QString(this, "Status",
                                       QString("Looking for a %1...").arg(Lg160x43Model::supportedText()),
                                       info_flags, lh_type_string_html);
+    connect(new LgUdevSetup(this), SIGNAL(rulesChanged()), this, SLOT(refreshStatus()));
     new LH_Qt_QString(this, "~guide",
                       QString("<a href=\"%1\">Hardware setup guide</a>").arg(hardware_guide_url),
                       info_flags | LH_FLAG_HIDETITLE, lh_type_string_html);
@@ -252,9 +254,8 @@ void LH_Lg160x43::refreshStatus()
 #ifdef Q_OS_LINUX
         if(error.code == EACCES || error.code == EPERM)
         {
-            lines << QString("%1 found, but LCDHost has no permission to use it: "
-                             "install the LCDHost udev rules (see the hardware setup guide).")
-                     .arg(model->name);
+            lines << QString("%1 found, but LCDHost has no permission to use it: %2.")
+                     .arg(model->name).arg(LgUdevSetup::permissionHint());
             continue;
         }
 #endif

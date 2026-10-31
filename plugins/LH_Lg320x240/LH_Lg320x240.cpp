@@ -42,6 +42,7 @@
 #include "LH_Qt_QString.h"
 #include "LH_Lg320x240.h"
 #include "G19Keys.h"
+#include "LgUdevSetup.h"
 #include "LogitechG19.h"
 
 LH_PLUGIN(LH_Lg320x240)
@@ -64,7 +65,7 @@ char __lcdhostplugin_xml[] =
     "It also reports the G-keys, M-keys and LCD keys to layouts.<br/>"
     "On Windows, the display interface of the G19 must use Microsoft's "
     "<a href=\"https://learn.microsoft.com/windows-hardware/drivers/usbcon/winusb\">WinUSB</a> driver: "
-    "use <i>Install driver</i> in the settings of this plugin. On Linux, install the LCDHost udev rules. "
+    "use <i>Install driver</i> in the settings of this plugin. On Linux, use <i>Install udev rules</i> there. "
     "See <a href=\"https://github.com/LokLakh-s/LCDHost-Revival/blob/master/docs/HARDWARE.md\">docs/HARDWARE.md</a>."
   "</longdesc>"
 "</lcdhostplugin>";
@@ -106,6 +107,7 @@ const char *LH_Lg320x240::userInit()
                                              info_flags | LH_FLAG_HIDETITLE, lh_type_string_button);
     connect(setup_remove_driver_, SIGNAL(changed()), this, SLOT(removeDriver()));
 #endif
+    new LgUdevSetup(this);
     new LH_Qt_QString(this, "~guide",
                       QString("<a href=\"%1\">Hardware setup guide</a>").arg(hardware_guide_url),
                       info_flags | LH_FLAG_HIDETITLE, lh_type_string_html);

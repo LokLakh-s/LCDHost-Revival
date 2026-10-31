@@ -24,6 +24,7 @@
 #include "LgBacklightDevice.h"
 #include "LH_HidDevice.h"
 #include "LH_HidReportInfo.h"
+#include "LgUdevSetup.h"
 
 #include <QDebug>
 #include <QtAlgorithms>
@@ -50,8 +51,9 @@ char __lcdhostplugin_xml[] =
   "</shortdesc>"
   "<longdesc>"
 "<p>HID-level backlight control for Logitech keyboards: colour on the G13, G19 and G510, "
-"off, dim or bright on the G11 and G15. No driver needs to be installed; on Linux, install the "
-"LCDHost udev rules (see <a href=\"https://github.com/LokLakh-s/LCDHost-Revival/blob/master/docs/HARDWARE.md\">docs/HARDWARE.md</a>).</p>"
+"off, dim or bright on the G11 and G15. No driver needs to be installed; on Linux, use "
+"<i>Install udev rules</i> in the settings of this plugin "
+"(see <a href=\"https://github.com/LokLakh-s/LCDHost-Revival/blob/master/docs/HARDWARE.md\">docs/HARDWARE.md</a>).</p>"
 "<p>To set the backlight for all connected devices from a layout, create a <i>data source</i> named "
 "<tt>/plugin/backlight/all/set</tt> using the link button <img src=\":/LH_Backlight/source.png\"></img> at any color item.</p>"
   "</longdesc>"
@@ -62,6 +64,7 @@ const char *LH_LgBacklight::userInit()
     if( const char *err = LH_QtPlugin::userInit() ) return err;
     status_ = new LH_Qt_QString( this, "Status", QString("Looking for a %1...").arg(LgBacklightModel::supportedText()),
                                  LH_FLAG_NOSAVE_DATA|LH_FLAG_NOSAVE_LINK|LH_FLAG_NOSOURCE|LH_FLAG_NOSINK, lh_type_string_html );
+    new LgUdevSetup( this );
     devselect_ = new LH_Qt_QStringList( this, "Device", QStringList(), LH_FLAG_NOSAVE_DATA|LH_FLAG_NOSAVE_LINK|LH_FLAG_NOSOURCE|LH_FLAG_NOSINK|LH_FLAG_HIDDEN );
     devselect_->setHelp( "The device which backlight you want to control." );
     connect( devselect_, SIGNAL(changed()), this, SLOT(changeDev()) );
@@ -168,8 +171,8 @@ void LH_LgBacklight::refreshStatus()
 #ifdef Q_OS_LINUX
         if(error.first == EACCES || error.first == EPERM)
         {
-            lines << QString("%1 found, but LCDHost has no permission to use it: "
-                             "install the LCDHost udev rules (see docs/HARDWARE.md).").arg(model->name);
+            lines << QString("%1 found, but LCDHost has no permission to use it: %2.")
+                     .arg(model->name).arg(LgUdevSetup::permissionHint());
             continue;
         }
 #endif

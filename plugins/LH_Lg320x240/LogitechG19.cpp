@@ -18,6 +18,7 @@
 */
 
 #include "LogitechG19.h"
+#include "LgUdevSetup.h"
 #include <QDebug>
 #include <QCoreApplication>
 
@@ -56,8 +57,7 @@ QString LogitechG19::errorText(int libusb_error)
                "LCDHost retries once it is closed.";
 #else
     case LIBUSB_ERROR_ACCESS:
-        return "G19 found, but LCDHost has no permission to use it: install the LCDHost udev rules, "
-               "then unplug and replug the keyboard.";
+        return "G19 found, but LCDHost has no permission to use it: " + LgUdevSetup::permissionHint() + ".";
     case LIBUSB_ERROR_BUSY:
         return "G19 found, but another program is using its display. LCDHost retries once it is closed.";
 #endif

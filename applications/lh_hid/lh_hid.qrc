@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/lh_hid">
+        <file alias="70-lcdhost.rules">../../packaging/linux/70-lcdhost.rules</file>
+    </qresource>
+</RCC>
