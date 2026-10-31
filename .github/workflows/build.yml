@@ -16,10 +16,12 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libusb-1.0-0-dev libhidapi-dev libgl1-mesa-dev libxkbcommon-x11-0
 
+      # qtserialport: the NMEA position plugin, which the AppImage bundles
+      # with Qt Positioning, needs it.
       - uses: jurplel/install-qt-action@v4
         with:
           version: '6.11.3'
-          modules: 'qtwebengine qtwebchannel qtpositioning'
+          modules: 'qtwebengine qtwebchannel qtpositioning qtserialport'
           cache: true
 
       - name: Configure
