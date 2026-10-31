@@ -19,7 +19,9 @@ SRC_DIR=$(cd "$(dirname "$0")/../.." && pwd)
 # that libusb and hidapi are found.
 PLUGINS="Bar Decor Dial Graph Image Text VirtualLCD Lg160x43 Lg320x240 LgBacklight"
 
-export HOME=$(mktemp -d)
+WORK=$(mktemp -d) || exit 1
+trap 'rm -rf "$WORK"' EXIT
+export HOME="$WORK/home"
 export XDG_CONFIG_HOME="$HOME/.config"
 export QT_QPA_PLATFORM=offscreen
 mkdir -p "$HOME/Documents/LCDHost" "$HOME/.config/Link Data"
