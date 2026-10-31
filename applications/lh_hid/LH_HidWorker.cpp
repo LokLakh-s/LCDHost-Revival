@@ -22,7 +22,7 @@
 #include "LH_HidDevice.h"
 #include "LH_HidPublisher.h"
 #include "LH_HidThread.h"
-#include "hidapi/hidapi.h"
+#include <hidapi.h>
 
 #include <errno.h>
 
@@ -264,11 +264,8 @@ void LH_HidWorker::enumerateDevices()
         }
         hid_free_enumeration(hdi_head);
     }
-    else
-    {
-        qDebug("HID: enumeration failed");
-        need_reset = true;
-    }
+    // hid_enumerate() also returns NULL when no HID device is present: the
+    // known devices are then simply offline.
 
     if(need_reset)
     {

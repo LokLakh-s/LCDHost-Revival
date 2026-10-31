@@ -7,7 +7,9 @@ set -u
 BIN_DIR=$(cd "$1" && pwd)
 DURATION=${2:-20}
 SRC_DIR=$(cd "$(dirname "$0")/../.." && pwd)
-PLUGINS="Bar Decor Dial Graph Image Text VirtualLCD"
+# The Logitech drivers must load without any device connected; they check
+# that libusb and hidapi are found.
+PLUGINS="Bar Decor Dial Graph Image Text VirtualLCD Lg160x43 Lg320x240 LgBacklight"
 
 export HOME=$(mktemp -d)
 export XDG_CONFIG_HOME="$HOME/.config"
@@ -48,7 +50,7 @@ if ! grep -q "Loading</span> Complete" "$LOG"; then
 fi
 if [ "$failed" -ne 0 ]; then
     echo "--- relevant log lines ---"
-    grep -vE 'nbsp|HID: enumeration failed|setParent|propagateSizeHints' "$LOG" | head -n 80
+    grep -vE 'nbsp|setParent|propagateSizeHints' "$LOG" | head -n 80
     exit 1
 fi
 echo "OK: LCDHost ran ${DURATION}s and loaded: $PLUGINS"

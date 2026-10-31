@@ -169,8 +169,8 @@ const char* LogitechG19::open()
         break;
     case LIBUSB_ERROR_ACCESS:
 #ifdef Q_OS_LINUX
-        qDebug("Try adding the following line to <strong><tt>/etc/udev/rules.d/99-logitech.rules</tt></strong>");
-        qDebug("<strong><tt>SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"046d\", ATTRS{idProduct}==\"c229\", MODE=\"0666\"</tt></strong>");
+        qDebug("No permission to use the G19: install the LCDHost udev rules "
+               "(packaging/linux/70-lcdhost.rules, see docs/HARDWARE.md)");
 #endif
         break;
     default:

@@ -60,16 +60,6 @@ char __lcdhostplugin_xml[] =
   "</longdesc>"
 "</lcdhostplugin>";
 
-extern "C"
-{
-    void libusb_log( const char *fmt, va_list args )
-    {
-        char buf[1024];
-        vsprintf( buf, fmt, args );
-        qDebug() << buf;
-    }
-}
-
 LH_Lg320x240::LH_Lg320x240() :
     LH_QtPlugin(),
     timer_id_(0),
@@ -90,7 +80,7 @@ const char *LH_Lg320x240::userInit()
     {
         if(libusb_init(&usb_ctx_) || !usb_ctx_)
             return "libusb_init() failed";
-        libusb_set_debug(usb_ctx_, 1);
+        libusb_set_option(usb_ctx_, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_ERROR);
     }
 
     if(!timer_id_)

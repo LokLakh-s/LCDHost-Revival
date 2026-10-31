@@ -29,10 +29,12 @@ Legend: ✅ done · 🚧 in progress · ⬜ planned
   been disabled at build time since the original project.
 - ⬜ **Move the build from qmake to CMake**, the build system recommended for
   Qt 6, and remove the custom qmake feature machinery.
-- ⬜ **Replace outdated bundled libraries** with current upstream versions,
-  obtained through the system package manager on Linux and vcpkg on Windows:
-  libusbx 1.0.15 → libusb, signal11 HIDAPI → libusb/hidapi, TagLib 1.7 →
-  TagLib 2, and drop the bundled zlib 1.2.5 (known vulnerabilities).
+- 🚧 **Replace outdated bundled libraries** with current upstream versions,
+  obtained through the system package manager on Linux and at pinned,
+  checksummed versions on Windows:
+  - ✅ libusbx 1.0.15 → libusb, signal11 HIDAPI → libusb/hidapi.
+  - ⬜ TagLib 1.7 → TagLib 2, and drop the bundled zlib 1.2.5 (known
+    vulnerabilities).
 - ⬜ Replace in-house helpers with Qt equivalents: `codeleap/json` →
   `QJsonDocument`.
 - ⬜ DataViewer: stop using a layout-provided string as a `printf` format.
@@ -76,8 +78,9 @@ See [docs/HARDWARE.md](docs/HARDWARE.md) for the current setup steps.
   WinUSB driver to the G19 display interface only (`MI_00`), with an explicit,
   elevated "Install driver" action and a matching uninstall (driver package
   and generated certificates).
-- ⬜ **Use upstream libusb and hidapi**: system packages on Linux (pkg-config),
-  vcpkg or pinned sources on Windows, instead of the 2013-era copies.
+- ✅ **Use upstream libusb and hidapi**: system packages on Linux
+  (pkg-config), official binaries at pinned versions on Windows, instead of
+  the 2013-era copies.
 - ⬜ G19: backlight colour through the HID interface (hidraw on Linux), and
   G-keys / M-keys as layout inputs.
 - ⬜ Make the proprietary Logitech LCD SDK plugin (`LgLcdMan`) optional and

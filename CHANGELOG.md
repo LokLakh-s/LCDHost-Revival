@@ -14,10 +14,23 @@ Versions up to 0.0.38 were released by the original author; see the
   with the Windows and Linux archives, SHA-256 checksums and the
   changelog section as notes.
 
+### Changed
+
+- libusb and hidapi are no longer bundled: LCDHost uses current upstream
+  versions (system packages on Linux; libusb 1.0.30 and hidapi 0.15.0 on
+  Windows) instead of copies from 2013. Building needs them, see README.md.
+- Linux: the hints logged when the G19 or a HID device is not accessible
+  point to the LCDHost udev rules instead of suggesting a world-writable
+  device.
+
+### Fixed
+
+- The HID layer was restarted every two seconds when no HID device was
+  connected.
+
 ### Removed
 
-- A Qt installer log committed by mistake, and the linker's `.lib`/`.exp`
-  files from the Windows build.
+- The linker's `.lib` and `.exp` files from the Windows build.
 
 ## [0.1.0] - 2026-09-27
 

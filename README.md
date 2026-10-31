@@ -54,15 +54,20 @@ On first start:
 ## Building from source
 
 Requirements: Qt **6.8 or later** (the CI uses 6.11) with the `qtwebengine`,
-`qtwebchannel` and `qtpositioning` modules for the WebKit plugin, and a C++17
-compiler. Install Qt with the [Qt online installer](https://www.qt.io/download-qt-installer-oss)
-or [aqtinstall](https://github.com/miurahr/aqtinstall), and put its `bin`
+`qtwebchannel` and `qtpositioning` modules for the WebKit plugin, a C++17
+compiler, [libusb](https://libusb.info/) 1.0 and
+[hidapi](https://github.com/libusb/hidapi). Install Qt with the
+[Qt online installer](https://www.qt.io/download-qt-installer-oss) or
+[aqtinstall](https://github.com/miurahr/aqtinstall), and put its `bin`
 directory in your `PATH`.
 
 ### Linux
 
+libusb and hidapi come from the distribution and are found with
+`pkg-config` (`libusb-1.0` and `hidapi-hidraw`).
+
 ```sh
-sudo apt-get install build-essential libudev-dev libgl1-mesa-dev libxkbcommon-dev
+sudo apt-get install build-essential pkg-config libusb-1.0-0-dev libhidapi-dev libgl1-mesa-dev libxkbcommon-dev
 mkdir build && cd build
 qmake ../LCDHost.pro -r
 make -j"$(nproc)"
@@ -72,8 +77,19 @@ cp -r ../layouts LCDHost.app/
 
 ### Windows
 
-With Qt 6 (`msvc2022_64`) and Visual Studio 2022, from an "x64 Native Tools"
-command prompt:
+With Qt 6 (`msvc2022_64`), Visual Studio 2022 and 7-Zip, first fetch the
+dependencies once.
+[`packaging/windows/fetch-deps.ps1`](packaging/windows/fetch-deps.ps1)
+downloads the official libusb and hidapi binaries at pinned versions and
+checks their SHA-256:
+
+```bat
+pwsh packaging\windows\fetch-deps.ps1 -Destination C:\lcdhost-deps
+```
+
+It prints two variables: set the environment variables `LIBUSB_DIR` and
+`HIDAPI_DIR` to these values. Then, from an "x64 Native Tools" command
+prompt:
 
 ```bat
 mkdir build && cd build
@@ -87,7 +103,8 @@ xcopy /E /I ..\layouts LCDHost.app\layouts
 ### Smoke test
 
 `tests/smoke/run.sh` starts LCDHost headless with the default layout and
-checks that it does not crash and that the core plugins load:
+checks that it does not crash and that the core plugins and the Logitech
+drivers load:
 
 ```sh
 tests/smoke/run.sh build/LCDHost.app/bin 20

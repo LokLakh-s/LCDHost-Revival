@@ -22,9 +22,7 @@
 
 #include <QDateTime>
 #include <LH_QtDevice.h>
-extern "C" {
-#include "libusb.h"
-}
+#include <libusb.h>
 
 
 class LogitechG19 : public LH_QtDevice

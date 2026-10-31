@@ -62,8 +62,8 @@ void LH_HidRequest::setError(const char *text, int code)
 #ifdef Q_OS_LINUX
         if(code == EACCES)
         {
-            qDebug("Try adding the following line to <strong><tt>/etc/udev/rules.d/99-lcdhost.rules</tt></strong>");
-            qDebug("SUBSYSTEM==\"hidraw\", ATTRS{idVendor}==\"%04x\", ATTRS{idProduct}==\"%04x\", MODE=\"0666\"",
+            qDebug("HID: no permission to use %04x:%04x: install the LCDHost udev rules "
+                   "(packaging/linux/70-lcdhost.rules, see docs/HARDWARE.md)",
                    device_->vendor_id(), device_->product_id());
         }
 #endif
