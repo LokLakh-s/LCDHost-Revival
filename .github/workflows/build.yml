@@ -34,10 +34,34 @@ jobs:
       - name: Smoke test
         run: tests/smoke/run.sh build/LCDHost.app/bin 20
 
+      - name: HID unit tests
+        run: mkdir build-tests && cd build-tests && qmake ../tests/hid/tst_hid.pro && make -j"$(nproc)" && ./tst_hid
+
+      - name: Simulated Logitech devices
+        run: tests/hid/run-fake-devices.sh build/LCDHost.app/bin 15
+
+      # The version of the AppImage: LH_VERSION, plus the commit outside tags.
+      - name: Build AppImage
+        run: |
+          version=$(sed -n 's/^ *LH_VERSION=//p' qmakecache/qmakecache.pro)
+          [ "$GITHUB_REF_TYPE" = tag ] || version="$version-${GITHUB_SHA::7}"
+          packaging/linux/build-appimage.sh build/LCDHost.app "$version" appimage
+
+      - name: AppImage smoke test
+        run: |
+          mkdir appimage-test && cd appimage-test
+          ../appimage/LCDHost-*-x86_64.AppImage --appimage-extract > /dev/null
+          cd .. && tests/smoke/run.sh appimage-test/squashfs-root/AppRun 20
+
       - uses: actions/upload-artifact@v7
         with:
           name: LCDHost-linux-x64
           path: build/LCDHost.app
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: LCDHost-linux-x64-appimage
+          path: appimage/LCDHost-*-x86_64.AppImage
 
   windows:
     runs-on: windows-2022
@@ -125,4 +149,5 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" --verify-tag \
             --title "LCDHost ${GITHUB_REF_NAME#v}" --notes-file release/notes.md \
-            release/LCDHost-*.zip release/LCDHost-*.tar.gz release/SHA256SUMS
+            release/LCDHost-*.zip release/LCDHost-*.tar.gz release/LCDHost-*.AppImage \
+            release/SHA256SUMS

@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
 # Headless smoke test: start LCDHost with the default layout and the core
 # plugins enabled, then check that it neither crashes nor fails to load them.
-# Usage: tests/smoke/run.sh <path to LCDHost.app/bin> [seconds]
+# Usage: tests/smoke/run.sh <LCDHost.app/bin, or a program that starts LCDHost> [seconds]
+# The program can be the AppRun of an extracted AppImage, which carries its
+# layouts (running the AppImage itself would leave LCDHost behind on timeout).
 set -u
 
-BIN_DIR=$(cd "$1" && pwd)
+if [ -f "$1" ]; then
+    EXE=$(cd "$(dirname "$1")" && pwd)/$(basename "$1")
+    BIN_DIR=
+else
+    BIN_DIR=$(cd "$1" && pwd)
+    EXE="$BIN_DIR/LCDHost"
+fi
 DURATION=${2:-20}
 SRC_DIR=$(cd "$(dirname "$0")/../.." && pwd)
 # The Logitech drivers must load without any device connected; they check
@@ -16,7 +24,7 @@ export XDG_CONFIG_HOME="$HOME/.config"
 export QT_QPA_PLATFORM=offscreen
 mkdir -p "$HOME/Documents/LCDHost" "$HOME/.config/Link Data"
 # Bundled layouts (next to bin/) are installed by LCDHost itself on first run.
-if [ ! -d "$BIN_DIR/../layouts" ]; then
+if [ -n "$BIN_DIR" ] && [ ! -d "$BIN_DIR/../layouts" ]; then
     cp -r "$SRC_DIR/layouts" "$HOME/Documents/LCDHost/"
 fi
 {
@@ -26,7 +34,7 @@ fi
 
 LOG="$HOME/lcdhost.log"
 # Run from an unrelated directory so library lookup cannot rely on the cwd.
-(cd / && timeout "$DURATION" "$BIN_DIR/LCDHost" > "$LOG" 2>&1)
+(cd / && timeout "$DURATION" "$EXE" > "$LOG" 2>&1)
 status=$?
 
 failed=0

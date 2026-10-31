@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=LCDHost
+GenericName=LCD layout editor
+Comment=Design layouts for Logitech keyboard LCDs and other small displays
+Exec=LCDHost
+Icon=lcdhost
+Terminal=false
+Categories=Utility;

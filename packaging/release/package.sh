@@ -2,8 +2,8 @@
 # Builds the release archives, their checksums and the release notes from the
 # build artifacts of the CI.
 # Usage: packaging/release/package.sh <version> <artifacts dir> <output dir>
-#   <artifacts dir> holds the LCDHost-linux-x64 and LCDHost-windows-x64
-#   folders downloaded from the build jobs.
+#   <artifacts dir> holds the LCDHost-linux-x64, LCDHost-linux-x64-appimage
+#   and LCDHost-windows-x64 folders downloaded from the build jobs.
 set -euo pipefail
 
 version=$1
@@ -47,7 +47,12 @@ cp -a "$artifacts/LCDHost-windows-x64" "$stage/$windows_dir"
 find "$stage/$windows_dir" \( -name '*.lib' -o -name '*.exp' \) -delete
 (cd "$stage" && zip -qr9 "$out/LCDHost-$version-windows-x64.zip" "$windows_dir")
 
-(cd "$out" && sha256sum "LCDHost-$version-linux-x64.tar.gz" "LCDHost-$version-windows-x64.zip" > SHA256SUMS)
+appimage="LCDHost-$version-x86_64.AppImage"
+cp "$artifacts/LCDHost-linux-x64-appimage/$appimage" "$out/$appimage"
+chmod +x "$out/$appimage"
+
+(cd "$out" && sha256sum "$appimage" "LCDHost-$version-linux-x64.tar.gz" \
+    "LCDHost-$version-windows-x64.zip" > SHA256SUMS)
 
 {
     sed "s/@VERSION@/$version/g" "$src/packaging/release/notes-header.md"
