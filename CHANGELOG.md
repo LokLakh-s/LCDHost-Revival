@@ -8,6 +8,8 @@ Versions up to 0.0.38 were released by the original author; see the
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-31
+
 ### Added
 
 - Windows: **Install driver** and **Remove driver** in the settings of the
@@ -135,7 +137,8 @@ Versions up to 0.0.38 were released by the original author; see the
 - Plugin load failures are logged.
 - Build instructions, headless smoke test and Linux CI.
 
-[Unreleased]: https://github.com/LokLakh-s/LCDHost-Revival/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/LokLakh-s/LCDHost-Revival/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/LokLakh-s/LCDHost-Revival/releases/tag/v0.2.0
 [0.1.0]: https://github.com/LokLakh-s/LCDHost-Revival/releases/tag/v0.1.0
 [0.0.42]: https://github.com/LokLakh-s/LCDHost-Revival/releases/tag/v0.0.42
 [0.0.41]: https://github.com/LokLakh-s/LCDHost-Revival/releases/tag/v0.0.41
