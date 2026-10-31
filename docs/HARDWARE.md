@@ -19,15 +19,20 @@ operating system needs so that LCDHost can reach the device.
 | G510 | 046d:c22d, 046d:c22e | 160×43 mono | `Lg160x43` (HID) |
 | Z-10 speakers | 046d:0a07 | 160×43 mono | `Lg160x43` (HID) |
 
-Backlight control (`LgBacklight` plugin) uses HID on the G11, G13, G15 v2,
-G510 and G19. The `LgLcdMan` plugin is an alternative that goes through the
-proprietary Logitech LCD SDK and therefore needs LGS; it is not needed when
-the direct drivers above are used.
+The driver plugins also report the keys to layouts (see [Keys](#keys)).
+Backlight control (`LgBacklight` plugin) uses HID: a colour on the G13, G19
+and G510, a level (off, dim, bright) on the G11, G15 and G15 v2.
+
+The `LgLcdMan` plugin, an alternative that goes through Logitech Gaming
+Software and the proprietary Logitech LCD SDK, is not part of the releases
+since 0.3.0 (developers can build it with their own copy of the SDK, see the
+README). The drivers above do not need any Logitech software.
 
 The G19 is a composite device: interface 0 (vendor specific) carries the
-display (bulk endpoint 0x02) and the menu keys (interrupt endpoint 0x81);
-interface 1 (HID) carries the G-keys, M-keys and backlight. LCDHost only
-claims interface 0.
+display (bulk endpoint 0x02) and the LCD keys (interrupt endpoint 0x81);
+interface 1 (HID) carries the G-keys, M-keys and backlight. LCDHost claims
+interface 0 through libusb and uses interface 1 through the operating
+system's HID driver, which it keeps.
 
 ## Linux
 
@@ -36,25 +41,38 @@ kernel driver `hid-lg-g15` is loaded (it also handles the G-keys and LEDs), so
 nothing needs to be detached. No kernel driver binds the G19 display
 interface, so libusb can claim it directly.
 
-Only permissions are needed (for the G19, the settings of the *Lg320x240*
-plugin in the **Plugins** tab tell when they are missing). Install the udev
-rules shipped in
-[`packaging/linux/70-lcdhost.rules`](../packaging/linux/70-lcdhost.rules):
+Only permissions are needed: the LCDHost udev rules
+([`packaging/linux/70-lcdhost.rules`](../packaging/linux/70-lcdhost.rules))
+give the user of the local session access to the devices
+(`TAG+="uaccess"`). The settings of the Logitech plugins (*Lg160x43*,
+*Lg320x240*, *LgBacklight*) in the **Plugins** tab tell when access is
+missing.
+
+**From LCDHost** (0.3.0 and later): click **Install udev rules** in the
+settings of one of these plugins and give the administrator password.
+LCDHost runs, as root through `pkexec`, a short script that writes the rules
+built into LCDHost to `/etc/udev/rules.d/70-lcdhost.rules`, reloads the udev
+rules and applies them to the connected devices; within a few seconds the
+status reads "ready". **Remove udev rules** deletes that file again. This
+works the same from the AppImage.
+
+**From a terminal**, in the source tree:
 
 ```sh
 sudo cp packaging/linux/70-lcdhost.rules /etc/udev/rules.d/
 sudo udevadm control --reload-rules && sudo udevadm trigger
 ```
 
-The rules grant access to the user of the local session (`TAG+="uaccess"`).
-For access over SSH, see the comment at the top of the file.
+For access over SSH or without a local session, see the comment at the top
+of the rules file.
 
 ## Windows
 
 ### 160×43 devices (G15, G13, G510, Z-10)
 
 These are standard HID devices: no driver installation is needed. Quit LGS
-or G HUB first, since they use the LCD too.
+first, since it draws on the LCD too; the settings of the *Lg160x43* plugin
+tell when it is running.
 
 ### G19 / G19s
 
@@ -103,9 +121,38 @@ Manager find the G19 display interface under *Universal Serial Bus devices*,
 uninstall it with *Delete the driver software for this device* ticked, then
 unplug and replug the keyboard.
 
+## Keys
+
+The driver plugins report the keys of the devices to layouts, under these
+names (the input settings of layout objects, such as the *Cursor* plugin
+ones, list them when you press a key):
+
+| Device | Keys |
+|---|---|
+| G19 | `G1`–`G12`, `M1`–`M3`, `MR`, `Light`; LCD keys `App`, `Cancel`, `Menu`, `Ok`, `Left`, `Right`, `Up`, `Down` (while LCDHost draws on the G19) |
+| G15 | `G1`–`G18`, `M1`–`M3`, `MR`, `Light`, `App`, `Softbutton 0`–`Softbutton 3` |
+| G15 v2 | `G1`–`G6`, `M1`–`M3`, `MR`, `Light`, `App`, `Softbutton 0`–`Softbutton 3` |
+| G13 | `G1`–`G22`, `M1`–`M3`, `MR`, `Light`, `App`, `Softbutton 0`–`Softbutton 3`, `Stick 1`–`Stick 3` (joystick buttons) |
+| G510 | `G1`–`G18`, `M1`–`M3`, `MR`, `App`, `Softbutton 0`–`Softbutton 3`, `Headphone mute`, `Microphone mute` |
+| Z-10 | `App`, `Softbutton 0`–`Softbutton 3` |
+
+`App` is the round button next to the LCD, `Softbutton 0` to `Softbutton 3`
+the four buttons under it, named as by the `LgLcdMan` plugin so that layouts
+work with both. Each key press and release is also written to the **Log**
+tab: please include them in hardware test reports. The key layouts come from
+the Linux kernel driver `hid-lg-g15`, the original LCDHost code and Gnome15;
+the order of the G510 LCD keys is not confirmed yet.
+
+Without Logitech software, the G15 and G510 also send F1–F12 (and more) for
+their G-keys, as a separate keyboard; on Linux, the kernel driver
+`hid-lg-g15` turns that off.
+
 ## Prior art
 
 Other open-source projects driving these devices, useful for reference:
+the Linux kernel driver
+[`hid-lg-g15`](https://github.com/torvalds/linux/blob/master/drivers/hid/hid-lg-g15.c)
+(G-keys, LEDs and backlight of the G13, G15, G510 and Z-10),
 [lcdproc](https://github.com/lcdproc/lcdproc) (G15/G510/Z-10 through hidraw),
 [g19daemon](https://github.com/mortendynamite/g19daemon) (G19 through libusb),
 [Gnome15](https://github.com/CMoH/gnome15) (archived).

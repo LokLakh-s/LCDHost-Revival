@@ -38,9 +38,11 @@ Legend: ✅ done · 🚧 in progress · ⬜ planned
 - ⬜ Replace in-house helpers with Qt equivalents: `codeleap/json` →
   `QJsonDocument`.
 - ⬜ DataViewer: stop using a layout-provided string as a `printf` format.
-- ⬜ **Stop redistributing proprietary SDKs** (Logitech LCD SDK, iTunes COM
-  SDK): let developers point the build to their own copy and make the
-  dependent features optional.
+- 🚧 **Stop redistributing proprietary SDKs**: let developers point the build
+  to their own copy and make the dependent features optional.
+  - ✅ Logitech LCD SDK: removed in 0.3.0; `LgLcdMan` is built only with
+    `LGLCD_SDK_DIR` and is no longer in the releases.
+  - ⬜ iTunes COM SDK (Now Playing).
 - ⬜ Target Windows 10 or later (required by Qt 6) and remove Windows XP era
   workarounds.
 - ⬜ Clean up compiler warnings and keep the build warning-free in CI.
@@ -83,15 +85,25 @@ See [docs/HARDWARE.md](docs/HARDWARE.md) for the current setup steps.
 - ✅ **Use upstream libusb and hidapi**: system packages on Linux
   (pkg-config), official binaries at pinned versions on Windows, instead of
   the 2013-era copies.
-- ⬜ G19: backlight colour through the HID interface (hidraw on Linux), and
-  G-keys / M-keys as layout inputs.
-- ⬜ Make the proprietary Logitech LCD SDK plugin (`LgLcdMan`) optional and
-  off by default; keep it only for users who want to stay on LGS.
-- 🚧 Clear messages when the device is busy (LGS or G HUB running) or the
-  driver or permissions are missing: done for the G19 (status in the plugin
-  settings), still to do for the HID devices.
-- ⬜ Linux packages (AppImage or Flatpak, and distribution packages) that
-  install the udev rules.
+- ✅ **Keys as layout inputs**: G-keys, M-keys, light key and LCD buttons of
+  the G19 (through its HID interface, whatever the state of the display),
+  G13, G15, G15 v2, G510 and Z-10, with the LCD button names of the Logitech
+  LCD SDK plugin.
+- ✅ **Backlight** with the right report for each keyboard: colour on the
+  G13, G19 and G510, level on the G11 and G15 (the G510 and G15 were sent the
+  G13 report before).
+- ✅ Make the proprietary Logitech LCD SDK plugin (`LgLcdMan`) optional: the
+  SDK is no longer in the repository, and like every plugin it stays off
+  until loaded in the Plugins tab.
+- ✅ **Clear messages** in the settings of the Logitech plugins: device not
+  connected, ready or in use, driver or udev rules missing, device used by
+  another program or by LGS, LCD interface not recognized.
+- 🚧 **Linux packages** that install the udev rules:
+  - ✅ An AppImage (Qt included), and *Install udev rules* / *Remove udev
+    rules* in the settings of the Logitech plugins (with `pkexec`).
+  - ⬜ Flatpak and distribution packages, once distributions ship Qt 6.11.
+- ⬜ Confirm the keys, backlight and LCD of each device with their owners
+  (see Phase 4), including the order of the G510 LCD keys.
 
 ## Phase 4: Hardware and platforms
 

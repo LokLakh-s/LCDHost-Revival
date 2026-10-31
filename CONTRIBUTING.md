@@ -91,9 +91,9 @@ Maintainers release from `master`:
    `applications/LCDHost/whatsnew.html`.
 3. Commit ("Release x.y.z"), tag the commit `vx.y.z`, then push the commit
    and the tag. The CI builds both platforms and publishes the GitHub
-   release: the archives, `SHA256SUMS`, and the changelog section as notes
-   (see `packaging/release/`). It refuses a tag that does not match
-   `LH_VERSION` or has no changelog section.
+   release: the archives, the AppImage, `SHA256SUMS`, and the changelog
+   section as notes (see `packaging/release/`). It refuses a tag that does
+   not match `LH_VERSION` or has no changelog section.
 
 ## Licensing of contributions
 

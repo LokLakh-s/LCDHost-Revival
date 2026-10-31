@@ -29,15 +29,17 @@ date. See the [roadmap](ROADMAP.md).
   menus, logic, weather (from [Open-Meteo](https://open-meteo.com/)), system monitoring (AIDA64, MSI Afterburner, CoreTemp, GPU-Z,
   HWiNFO, SpeedFan), now playing (iTunes, Winamp, foobar2000, VLC, Spotify),
   TeamSpeak 3, web pages and RSS feeds.
-- Output drivers for Logitech 160×43 and 320×240 LCDs (direct HID/USB or
-  through the Logitech LCD SDK) and a **virtual LCD** for testing without
-  hardware.
+- Free output drivers for the Logitech G13, G15, G19, G510 and Z-10 LCDs
+  (direct HID/USB, no Logitech software needed), which also report the
+  G-keys, M-keys and LCD buttons to layouts and set the keyboard backlight,
+  and a **virtual LCD** for testing without hardware.
 
 ## Getting LCDHost
 
-Download the latest version for Windows x64 or Linux x64 from the
+Download the latest version for Windows x64 or Linux x64 (an AppImage, or an
+archive that uses the Qt of your system) from the
 [releases page](https://github.com/LokLakh-s/LCDHost-Revival/releases); the
-release notes explain what each archive needs. Builds of every `master`
+release notes explain what each file needs. Builds of every `master`
 commit are also available from the
 [build runs](https://github.com/LokLakh-s/LCDHost-Revival/actions/workflows/build.yml)
 (`LCDHost-windows-x64` and `LCDHost-linux-x64`, GitHub sign-in required).
@@ -102,14 +104,23 @@ windeployqt --release --no-translations LCDHost.app\bin\WebKitServer.exe
 xcopy /E /I ..\layouts LCDHost.app\layouts
 ```
 
-### Smoke test
+The `LgLcdMan` plugin, which drives the LCDs through Logitech Gaming
+Software, needs the proprietary Logitech LCD SDK, which this repository does
+not include. To build it, set `LGLCD_SDK_DIR` to a folder that holds `lglcd.h`
+and the x64 `lglcd.lib` of your copy of the SDK; otherwise it is skipped.
+
+### Tests
 
 `tests/smoke/run.sh` starts LCDHost headless with the default layout and
 checks that it does not crash and that the core plugins and the Logitech
-drivers load:
+drivers load. `tests/hid/run-fake-devices.sh` runs it with simulated Logitech
+HID devices (a fake hidapi) and checks what the drivers do with them, and
+`tests/hid/tst_hid.pro` holds unit tests of the HID report parsing (Linux):
 
 ```sh
 tests/smoke/run.sh build/LCDHost.app/bin 20
+tests/hid/run-fake-devices.sh build/LCDHost.app/bin 15
+mkdir build-tests && cd build-tests && qmake ../tests/hid/tst_hid.pro && make && ./tst_hid
 ```
 
 ## Documentation

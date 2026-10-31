@@ -31,17 +31,17 @@ current (inherited) design; planned changes are listed in the
 | Path | Contents |
 |---|---|
 | `applications/LCDHost/` | The host application: main window, layout editor, plugin loading, rendering, device handling. |
-| `applications/lh_hid/` | Shared HID access library (wraps the system's hidapi), used by the Logitech HID drivers. |
+| `applications/lh_hid/` | Shared HID access library (wraps the system's hidapi: device discovery, report descriptors, input reports), used by the Logitech drivers, and the Linux udev rules installer (`LH_UdevRules`). |
 | `applications/LCDHostDriverSetup/` | Windows only: elevated helper that installs or removes the WinUSB driver of the G19 display, built on libwdi. |
 | `applications/lh_logger/` | Logging to `Documents/LCDHost/logs/`. |
 | `linkdata/lh_api5plugin/` | The plugin API: `lh_plugin.h` (C ABI) and the `LH_Qt*` C++ helper classes most plugins are built on. |
 | `codeleap/` | Libraries shared by the CodeLeap plugins: JSON (`json`), conditional formatting (`ConditionalFormatting`), offline translation cache (`SimpleTranslator`). |
-| `plugins/` | One directory per plugin. |
+| `plugins/` | One directory per plugin; `LgCommon/` holds code shared by the Logitech drivers. |
 | `3rdParty/` | Bundled third-party libraries (TagLib, zlib), see [THIRD_PARTY.md](THIRD_PARTY.md). |
 | `lh_features/`, `qmakecache/`, `.qmake.cache.in` | qmake helpers: shared build settings and optional features (shared libraries a project can pull in) defined in `lh_features/lh_*.pri`. |
 | `layouts/` | Default layouts installed on first run. |
-| `packaging/` | Linux udev rules, the Windows dependency script (`windows/fetch-deps.ps1`) and the release packaging used by the CI. |
-| `tests/` | Smoke test, driver installer test and test layouts for individual plugins. |
+| `packaging/` | Linux udev rules, desktop file and AppImage script (`linux/build-appimage.sh`), the Windows dependency script (`windows/fetch-deps.ps1`) and the release packaging used by the CI. |
+| `tests/` | Smoke test, HID unit tests and simulated Logitech devices (`hid/`), driver installer test and test layouts for individual plugins. |
 
 ## The plugin API
 
