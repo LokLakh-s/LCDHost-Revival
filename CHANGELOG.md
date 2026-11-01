@@ -8,6 +8,49 @@ Versions up to 0.0.38 were released by the original author; see the
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-01
+
+### Added
+
+- Keys as layout inputs: the G-keys, M-keys, light key and LCD buttons of
+  the G13, G15, G15 v2, G510 and Z-10 (Lg160x43 plugin) and the G-keys,
+  M-keys and light key of the G19 (Lg320x240 plugin, through its HID
+  interface). The LCD buttons have the names that the Logitech LCD SDK
+  plugin used ("Softbutton 0" to "Softbutton 3"), so layouts work with both.
+  Key presses are written to the log, to help hardware testers.
+- Linux: an AppImage, with Qt included. **Install udev rules** and **Remove
+  udev rules** in the settings of the Logitech plugins install or remove the
+  LCDHost udev rules, built into LCDHost, after asking for the administrator
+  password (`pkexec`).
+- The settings of the Lg160x43 and LgBacklight plugins show a status, like
+  the G19 plugin: devices ready or in use, missing udev rules, devices that
+  cannot be opened, LCD interface not recognized, Logitech Gaming Software
+  running.
+- Tests: unit tests of the HID code and of the udev rules installer, and a
+  run of LCDHost with simulated Logitech HID devices, in the CI.
+
+### Changed
+
+- The Logitech LCD SDK is no longer in the repository: the LgLcdMan plugin,
+  which drives the LCDs through Logitech Gaming Software, is only built when
+  a developer provides the SDK (`LGLCD_SDK_DIR`), and is not in the releases.
+- 160×43 LCDs: LCDHost uses the HID interface or collection that declares
+  the LCD report, so a G510 no longer appears once per interface, and the
+  device IDs no longer depend on the HID device path.
+- Lg160x43 no longer refuses to load while Logitech Gaming Software runs: the
+  status says so instead.
+
+### Fixed
+
+- Backlight: the G510 and the G11/G15 keyboards were sent the colour report
+  of the G13; they now get their own (colour on the G510, off, dim or bright
+  on the G11 and G15), with the size that the device declares.
+- Backlight: each keyboard is listed once, the colour set is remembered, and
+  changing the poll interval no longer starts an extra timer.
+- G19: the first LCD key used the input item 0, which the plugin API forbids.
+- HID: a device that gets the path of an unplugged one (Linux reuses hidraw
+  numbers) is no longer mistaken for it.
+
 ## [0.2.0] - 2026-10-31
 
 ### Added
@@ -137,7 +180,8 @@ Versions up to 0.0.38 were released by the original author; see the
 - Plugin load failures are logged.
 - Build instructions, headless smoke test and Linux CI.
 
-[Unreleased]: https://github.com/LokLakh-s/LCDHost-Revival/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/LokLakh-s/LCDHost-Revival/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/LokLakh-s/LCDHost-Revival/releases/tag/v0.3.0
 [0.2.0]: https://github.com/LokLakh-s/LCDHost-Revival/releases/tag/v0.2.0
 [0.1.0]: https://github.com/LokLakh-s/LCDHost-Revival/releases/tag/v0.1.0
 [0.0.42]: https://github.com/LokLakh-s/LCDHost-Revival/releases/tag/v0.0.42
